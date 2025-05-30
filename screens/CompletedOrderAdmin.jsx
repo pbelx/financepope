@@ -14,6 +14,8 @@ const CompletedOrderAdmin = () => {
   const navigation = useNavigation();
   const { user } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
+  const [places, setPlaces] = useState([]);
+  const [allBanks, setAllBanks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -42,6 +44,49 @@ const CompletedOrderAdmin = () => {
       console.log("Error fetching completed orders:", error);
       setLoading(false);
     }
+  };
+
+  // Fetch places and extract banks (from AdminAssignPage)
+  const fetchPlaces = async () => {
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.get("/places");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setPlaces(data.payload);
+        
+        // Extract all banks from all places
+        const banksFromPlaces = [];
+        data.payload.forEach(place => {
+          if (place.banks && place.banks.length > 0) {
+            place.banks.forEach(bank => {
+              // Only add if not already in the array (avoid duplicates)
+              if (!banksFromPlaces.find(b => b.id === bank.id)) {
+                banksFromPlaces.push({
+                  ...bank,
+                  placeName: place.name // Add place name for context if needed
+                });
+              }
+            });
+          }
+        });
+        setAllBanks(banksFromPlaces);
+      } else {
+        console.error("Failed to fetch places");
+        throw new Error("Failed to fetch places");
+      }
+    } catch (error) {
+      console.error("Error fetching places:", error);
+      throw error;
+    }
+  };
+
+  // Helper function to get bank name by ID (from AdminAssignPage)
+  const getBankName = (bankId) => {
+    if (!bankId) return 'N/A';
+    const bank = allBanks.find(bank => bank.id && bank.id.toString() === bankId.toString());
+    return bank ? bank.name : `Bank ID: ${bankId}`;
   };
 
   // Alternative method to fetch all completed orders (without pagination)
@@ -89,9 +134,15 @@ const CompletedOrderAdmin = () => {
   };
 
   useEffect(() => {
-    // You can choose between paginated or all orders
-    fetchOrders(1, 10); // For paginated results
-    // fetchAllCompletedOrders(); // For all results at once
+    // Fetch both orders and places/banks
+    const fetchAllData = async () => {
+      await Promise.all([
+        fetchOrders(1, 10),
+        fetchPlaces()
+      ]);
+    };
+    
+    fetchAllData();
   }, []);
 
   return (
@@ -212,11 +263,11 @@ const CompletedOrderAdmin = () => {
                       <Text style={{ fontWeight: 'bold' }}>{item?.receiverAddress}</Text>
                       <Text style={{ color: COLORS.gray }}>Receiver Address</Text>
                     </View>
-                    <View style={{ width: 150, padding: 5 }}>
-                      <Text style={{ fontWeight: 'bold' }}>{item?.bank}</Text>
+                    <View style={{ width: 120, padding: 5 }}>
+                      <Text style={{ fontWeight: 'bold' }}>{getBankName(item?.bankId || item?.bank)}</Text>
                       <Text style={{ color: COLORS.gray }}>Receiver Bank</Text>
                     </View>
-                    <View style={{ width: 80, padding: 5 }}>
+                    <View style={{ width: 100, padding: 5, alignItems: 'center', justifyContent: 'center' }}>
                       <View style={[styles.statusBadge, { backgroundColor: COLORS.success || '#4CAF50' }]}>
                         <Text style={styles.statusText}>Completed</Text>
                       </View>
@@ -240,7 +291,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     backgroundColor: '#fff',
-    width: 1180, // Increased width to accommodate status badge
+    width: 1200, // Adjusted width to accommodate status badge properly
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -326,15 +377,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 8,
+    maxWidth: 80, // Prevent badge from overrunning
   },
   statusText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
   },
 });

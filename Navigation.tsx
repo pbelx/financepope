@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Feather, Ionicons, AntDesign } from "@expo/vector-icons";
 import Home from "./screens/Home";
+import About from "./screens/About"; // Import the About component
 import Settings from "./screens/Settings";
 import Login from "./screens/Login";
 import SignUp from "./screens/SignUp";
@@ -25,9 +26,8 @@ import Messages from "./screens/Messages";
 import AllOrders from "./screens/AllOrders";
 import Admins from "./screens/Admins";
 import Transactions from "./screens/Transactions";
-import CompletedOrderAdmin from "./screens/CompletedOrderAdmin"; // Fixed extension: .jsx -> removed (TypeScript)
+import CompletedOrderAdmin from "./screens/CompletedOrderAdmin";
 import AdminPendingOrder from "./components/AdminPendingOrder";
-// import AdminHome from "./components/AdminHome";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -38,6 +38,7 @@ function StackNav() {
       <Stack.Screen name="Login" component={Login} />
       <Stack.Screen name="SignUp" component={SignUp} />
       <Stack.Screen name="Reset" component={Reset} />
+      <Stack.Screen name="About" component={About} />
       <Stack.Screen name="Balances" component={Balances} />
       <Stack.Screen name="Collections" component={Collections} />
       <Stack.Screen name="CompletedOrderAdmin" component={CompletedOrderAdmin} />
@@ -57,7 +58,7 @@ function StackNav() {
       <Stack.Screen name="Admin" component={Admins} />
       <Stack.Screen name="Home" component={TabNav} />
       <Stack.Screen name="Transactions" component={Transactions} />
-      <Stack.Screen name="AdminPendingOrder"component={AdminPendingOrder}/>
+      <Stack.Screen name="AdminPendingOrder" component={AdminPendingOrder} />
     </Stack.Navigator>
   );
 }
@@ -86,12 +87,12 @@ function TabNav() {
       />
       <Tab.Screen
         name="About"
-        component={Home}
+        component={About}
         options={{
           tabBarLabel: "About",
           headerShown: false,
           tabBarIcon: ({ color }) => (
-            <Ionicons name="wallet-outline" size={24} color={color} />
+            <Ionicons name="information-circle-outline" size={24} color={color} />
           ),
         }}
       />

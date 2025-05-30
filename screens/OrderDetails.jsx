@@ -21,10 +21,29 @@ import gstyles from "../styles";
 import { generateAxiosInstance } from "../shared/constants";
 
 const OrderDetails = ({ route }) => {
-  const { order } = route.params; // Get the order data from navigation params
+  // Get the order data from navigation params with error handling
+  const order = route?.params?.order || null;
+  
+  // If no order is provided, show error or navigate back
+  if (!order) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>No order data found</Text>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   const [status, setStatus] = useState(order?.status || "pending");
   const [message, setMessage] = useState("");
   const [members, setMembers] = useState([]);
+  const [places, setPlaces] = useState([]);
+  const [allBanks, setAllBanks] = useState([]);
+  const [currencies, setCurrencies] = useState([]); // Add currencies state
   const [selectedMemberId, setSelectedMemberId] = useState(
     order?.member?.id || null
   );
@@ -32,9 +51,11 @@ const OrderDetails = ({ route }) => {
   const navigation = useNavigation();
   const [currentOrder, setCurrentOrder] = useState(order);
 
-  // Fetch members from API
+  // Fetch all required data on component mount
   useEffect(() => {
     fetchMembers();
+    fetchPlaces();
+    fetchCurrencies(); // Add currency fetching
   }, []);
 
   const fetchMembers = async () => {
@@ -55,6 +76,103 @@ const OrderDetails = ({ route }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Fetch currencies
+  const fetchCurrencies = async () => {
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.get("/currency/all");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setCurrencies(data.payload);
+      } else {
+        console.error("Failed to fetch currencies");
+      }
+    } catch (error) {
+      console.error("Error fetching currencies:", error);
+    }
+  };
+
+  // Fetch places and extract banks
+  const fetchPlaces = async () => {
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.get("/places");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setPlaces(data.payload);
+        
+        // Extract all banks from all places
+        const banksFromPlaces = [];
+        data.payload.forEach(place => {
+          if (place.banks && place.banks.length > 0) {
+            place.banks.forEach(bank => {
+              // Only add if not already in the array (avoid duplicates)
+              if (!banksFromPlaces.find(b => b.id === bank.id)) {
+                banksFromPlaces.push({
+                  ...bank,
+                  placeName: place.name // Add place name for context if needed
+                });
+              }
+            });
+          }
+        });
+        setAllBanks(banksFromPlaces);
+      }
+    } catch (error) {
+      console.error("Error fetching places:", error);
+    }
+  };
+
+  // Helper function to get bank name by ID
+  const getBankName = (bankId) => {
+    if (!bankId) return 'N/A';
+    const bank = allBanks.find(bank => bank.id && bank.id.toString() === bankId.toString());
+    return bank ? bank.name : 'N/A';
+  };
+
+  // Helper function to get place name by ID
+  const getPlaceName = (placeId) => {
+    if (!placeId) return 'N/A';
+    const place = places.find(place => place.id && place.id.toString() === placeId.toString());
+    return place ? place.name : 'N/A';
+  };
+
+  // Helper function to get currency info by ID
+  const getCurrencyInfo = (currencyId) => {
+    if (!currencyId) return { name: 'N/A', symbol: '', code: '' };
+    const currency = currencies.find(curr => curr.id && curr.id.toString() === currencyId.toString());
+    return currency ? currency : { name: 'N/A', symbol: '', code: '' };
+  };
+
+  // Format currency with symbol/code
+  const formatCurrencyDisplay = (currencyId) => {
+    const currency = getCurrencyInfo(currencyId);
+    if (currency.symbol) {
+      return `${currency.name} (${currency.symbol})`;
+    } else if (currency.code) {
+      return `${currency.name} (${currency.code})`;
+    }
+    return currency.name;
+  };
+
+  // Enhanced conversion calculation using actual rates
+  const calculateConversion = (amount, fromCurrencyId, toCurrencyId) => {
+    const fromCurrency = getCurrencyInfo(fromCurrencyId);
+    const toCurrency = getCurrencyInfo(toCurrencyId);
+    
+    if (!fromCurrency.rate_per_dollar || !toCurrency.rate_per_dollar) {
+      return "Rate not available";
+    }
+
+    // Convert to USD first, then to target currency
+    const usdAmount = amount / fromCurrency.rate_per_dollar;
+    const convertedAmount = usdAmount * toCurrency.rate_per_dollar;
+    
+    return `${convertedAmount.toFixed(2)} ${toCurrency.symbol || toCurrency.code || toCurrency.name}`;
   };
 
   // Handle member assignment
@@ -110,9 +228,11 @@ const OrderDetails = ({ route }) => {
   };
 
   // Format currency helper function
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount, currencyId) => {
     if (!amount) return "0";
-    return amount.toLocaleString();
+    const currency = getCurrencyInfo(currencyId);
+    const formattedAmount = amount.toLocaleString();
+    return `${formattedAmount} ${currency.symbol || currency.code || currency.name}`;
   };
 
   // Get status color
@@ -214,9 +334,11 @@ const OrderDetails = ({ route }) => {
                   Address: {order?.receiverAddress || "N/A"}
                 </Text>
                 <Text style={styles.detail}>
-                  Location: {order?.receiverPlace || "N/A"}
+                  Location: {getPlaceName(order?.placeId || order?.receiverPlace) || "N/A"}
                 </Text>
-                <Text style={styles.detail}>Bank: {order?.bank || "N/A"}</Text>
+                <Text style={styles.detail}>
+                  Bank: {getBankName(order?.bankId || order?.bank) || "N/A"}
+                </Text>
                 <Text style={{ color: COLORS.gray, marginTop: 5 }}>
                   Receiver Details
                 </Text>
@@ -250,9 +372,12 @@ const OrderDetails = ({ route }) => {
                       fontSize: 17,
                     }}
                   >
-                    {formatCurrency(order?.amount)}
+                    {formatCurrency(order?.amount, order?.fromCurrency)}
                   </Text>
                 </View>
+                <Text style={styles.conversionText}>
+                  → {calculateConversion(order?.amount, order?.fromCurrency, order?.receiverCurrency)}
+                </Text>
                 <Text
                   style={{
                     fontSize: 12,
@@ -274,6 +399,7 @@ const OrderDetails = ({ route }) => {
             {messages.map((message) => {
               return (
                 <View
+                  key={message.id}
                   style={{
                     padding: 10,
                     backgroundColor: COLORS.primary,
@@ -482,10 +608,16 @@ const OrderDetails = ({ route }) => {
                 Order ID: #{order?.id || "N/A"}
               </Text>
               <Text style={styles.infoRow}>
-                From Currency: {order?.fromCurrency || "N/A"}
+                From Currency: {formatCurrencyDisplay(order?.fromCurrency)}
               </Text>
               <Text style={styles.infoRow}>
-                To Currency: {order?.receiverCurrency || "N/A"}
+                To Currency: {formatCurrencyDisplay(order?.receiverCurrency)}
+              </Text>
+              <Text style={styles.infoRow}>
+                Amount: {formatCurrency(order?.amount, order?.fromCurrency)}
+              </Text>
+              <Text style={styles.infoRow}>
+                Converted Amount: {calculateConversion(order?.amount, order?.fromCurrency, order?.receiverCurrency)}
               </Text>
               <Text style={styles.infoRow}>
                 Created: {formatDate(order?.createdAt)}
@@ -599,6 +731,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "bold",
   },
+  conversionText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
+  },
   input: {
     height: 40,
     borderColor: "gray",
@@ -658,6 +795,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   assignButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: "#666",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  backButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  backButtonText: {
     color: "white",
     fontSize: 16,
     fontWeight: "bold",

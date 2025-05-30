@@ -19,7 +19,6 @@ import { COLORS } from "../theme";
 import { useNavigation } from "@react-navigation/native";
 import { AntDesign } from "@expo/vector-icons";
 
-
 const statusColors = {
   pending: "#FFD700",
   approved: "#2196F3",
@@ -43,8 +42,64 @@ const AdminPendingOrder = () => {
   const [members, setMembers] = useState([]);
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [assigningMember, setAssigningMember] = useState(false);
+  
+  // New state for places, banks, and currencies
+  const [places, setPlaces] = useState([]);
+  const [currencies, setCurrencies] = useState([]);
+  const [allBanks, setAllBanks] = useState([]);
 
   const ITEMS_PER_PAGE = 10;
+
+  // Fetch places (which contains banks)
+  const fetchPlaces = async () => {
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.get("/places");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setPlaces(data.payload);
+        
+        // Extract all banks from all places
+        const banksFromPlaces = [];
+        data.payload.forEach(place => {
+          if (place.banks && place.banks.length > 0) {
+            place.banks.forEach(bank => {
+              // Only add if not already in the array (avoid duplicates)
+              if (!banksFromPlaces.find(b => b.id === bank.id)) {
+                banksFromPlaces.push({
+                  ...bank,
+                  placeName: place.name // Add place name for context if needed
+                });
+              }
+            });
+          }
+        });
+        setAllBanks(banksFromPlaces);
+      } else {
+        console.error("Failed to fetch places");
+      }
+    } catch (error) {
+      console.error("Error fetching places:", error);
+    }
+  };
+
+  // Fetch currencies
+  const fetchCurrencies = async () => {
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.get("/currency/all");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setCurrencies(data.payload);
+      } else {
+        console.error("Failed to fetch currencies");
+      }
+    } catch (error) {
+      console.error("Error fetching currencies:", error);
+    }
+  };
 
   // Fetch members from API
   const fetchMembers = async () => {
@@ -62,6 +117,24 @@ const AdminPendingOrder = () => {
       console.error("Error fetching members:", error);
       Alert.alert("Error", "Failed to fetch members");
     }
+  };
+
+  // Helper function to get bank name by ID
+  const getBankName = (bankId) => {
+    const bank = allBanks.find(bank => bank.id.toString() === bankId.toString());
+    return bank ? bank.name : `Bank ID: ${bankId}`;
+  };
+
+  // Helper function to get currency info by ID
+  const getCurrencyInfo = (currencyId) => {
+    const currency = currencies.find(curr => curr.id.toString() === currencyId.toString());
+    return currency ? currency : { name: `Currency ID: ${currencyId}`, symbol: '', code: '' };
+  };
+
+  // Helper function to get place name by ID
+  const getPlaceName = (placeId) => {
+    const place = places.find(place => place.id.toString() === placeId.toString());
+    return place ? place.name : `Place ID: ${placeId}`;
   };
 
   // Fetch pending orders count
@@ -189,9 +262,20 @@ const AdminPendingOrder = () => {
   };
 
   useEffect(() => {
-    fetchOrders();
-    fetchOrdersCount();
-    fetchMembers();
+    const initializeData = async () => {
+      // Fetch currencies and places first since they're needed for display
+      await Promise.all([
+        fetchCurrencies(),
+        fetchPlaces(),
+        fetchMembers()
+      ]);
+      
+      // Then fetch orders
+      await fetchOrders();
+      await fetchOrdersCount();
+    };
+
+    initializeData();
   }, []);
 
   const onRefresh = () => {
@@ -356,10 +440,25 @@ const AdminPendingOrder = () => {
     </Modal>
   );
 
-  const formatCurrency = (amount, currencyCode) => {
-    return `${amount} ${
-      currencyCode === 1 ? "USD" : currencyCode === 2 ? "UGX" : ""
-    }`;
+  const formatCurrency = (amount, currencyId) => {
+    const currency = getCurrencyInfo(currencyId);
+    return `${amount} ${currency.symbol || currency.code || currency.name}`;
+  };
+
+  // Enhanced conversion calculation using actual rates
+  const calculateConversion = (amount, fromCurrencyId, toCurrencyId) => {
+    const fromCurrency = getCurrencyInfo(fromCurrencyId);
+    const toCurrency = getCurrencyInfo(toCurrencyId);
+    
+    if (!fromCurrency.rate_per_dollar || !toCurrency.rate_per_dollar) {
+      return "Rate not available";
+    }
+
+    // Convert to USD first, then to target currency
+    const usdAmount = amount / fromCurrency.rate_per_dollar;
+    const convertedAmount = usdAmount * toCurrency.rate_per_dollar;
+    
+    return `${convertedAmount.toFixed(2)} ${toCurrency.symbol || toCurrency.code || toCurrency.name}`;
   };
 
   return (
@@ -439,12 +538,7 @@ const AdminPendingOrder = () => {
                     {formatCurrency(order.amount, order.fromCurrency)}
                   </Text>
                   <Text style={styles.conversionText}>
-                    →{" "}
-                    {formatCurrency(
-                      order.amount *
-                        (order.receiverCurrency === 1 ? 0.00027 : 3700),
-                      order.receiverCurrency
-                    )}
+                    → {calculateConversion(order.amount, order.fromCurrency, order.receiverCurrency)}
                   </Text>
                 </View>
 
@@ -465,7 +559,7 @@ const AdminPendingOrder = () => {
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Bank:</Text>
-                    <Text style={styles.detailValue}>{order.bank}</Text>
+                    <Text style={styles.detailValue}>{getBankName(order.bank)}</Text>
                   </View>
 
                   <View style={styles.detailRow}>
@@ -478,7 +572,7 @@ const AdminPendingOrder = () => {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Location:</Text>
                     <Text style={styles.detailValue}>
-                      {order.receiverPlace}
+                      {getPlaceName(order.receiverPlace)}
                     </Text>
                   </View>
                 </View>
