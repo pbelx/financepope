@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "961311923431",
+    "project_id": "flfl-eaa22",
+    "storage_bucket": "flfl-eaa22.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:961311923431:android:d3dc0b4d901f1ffbf65642",
+        "android_client_info": {
+          "package_name": "com.jirehdevsoftware.flflstore"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC89EfhyPzQ7EmhXjjQNJaXS76ULuTYOCI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
