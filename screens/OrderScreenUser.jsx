@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,20 +6,152 @@ import {
   StyleSheet,
   Pressable,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { COLORS } from "../theme";
+import { generateAxiosInstance } from "../shared/constants";
 
 const statusColors = {
   pending: "#FFD700",
   completed: "#4CAF50",
   failed: "#F44336",
+  approved: "#2196F3",
+  cancelled: "#F44336",
 };
 
 const OrderDetailsScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { order } = route.params;
+
+  // State for lookup data
+  const [places, setPlaces] = useState([]);
+  const [allBanks, setAllBanks] = useState([]);
+  const [currencies, setCurrencies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch all required data on component mount
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const fetchAllData = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([
+        fetchPlaces(),
+        fetchCurrencies(),
+      ]);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch currencies
+  const fetchCurrencies = async () => {
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.get("/currency/all");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setCurrencies(data.payload);
+      }
+    } catch (error) {
+      console.error("Error fetching currencies:", error);
+    }
+  };
+
+  // Fetch places and extract banks
+  const fetchPlaces = async () => {
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.get("/places");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setPlaces(data.payload);
+        
+        // Extract all banks from all places
+        const banksFromPlaces = [];
+        data.payload.forEach(place => {
+          if (place.banks && place.banks.length > 0) {
+            place.banks.forEach(bank => {
+              // Only add if not already in the array (avoid duplicates)
+              if (!banksFromPlaces.find(b => b.id === bank.id)) {
+                banksFromPlaces.push({
+                  ...bank,
+                  placeName: place.name // Add place name for context if needed
+                });
+              }
+            });
+          }
+        });
+        setAllBanks(banksFromPlaces);
+      }
+    } catch (error) {
+      console.error("Error fetching places:", error);
+    }
+  };
+
+  // Helper function to get bank name by ID
+  const getBankName = (bankId) => {
+    if (!bankId) return 'N/A';
+    const bank = allBanks.find(bank => bank.id && bank.id.toString() === bankId.toString());
+    return bank ? bank.name : 'N/A';
+  };
+
+  // Helper function to get place name by ID
+  const getPlaceName = (placeId) => {
+    if (!placeId) return 'N/A';
+    const place = places.find(place => place.id && place.id.toString() === placeId.toString());
+    return place ? place.name : 'N/A';
+  };
+
+  // Helper function to get currency info by ID
+  const getCurrencyInfo = (currencyId) => {
+    if (!currencyId) return { name: 'N/A', symbol: '', code: '' };
+    const currency = currencies.find(curr => curr.id && curr.id.toString() === currencyId.toString());
+    return currency ? currency : { name: 'N/A', symbol: '', code: '' };
+  };
+
+  // Format currency with symbol/code
+  const formatCurrencyDisplay = (currencyId) => {
+    const currency = getCurrencyInfo(currencyId);
+    if (currency.symbol) {
+      return `${currency.name} (${currency.symbol})`;
+    } else if (currency.code) {
+      return `${currency.name} (${currency.code})`;
+    }
+    return currency.name;
+  };
+
+  // Enhanced conversion calculation using actual rates
+  const calculateConversion = (amount, fromCurrencyId, toCurrencyId) => {
+    const fromCurrency = getCurrencyInfo(fromCurrencyId);
+    const toCurrency = getCurrencyInfo(toCurrencyId);
+    
+    if (!fromCurrency.rate_per_dollar || !toCurrency.rate_per_dollar) {
+      return "Rate not available";
+    }
+
+    // Convert to USD first, then to target currency
+    const usdAmount = amount / fromCurrency.rate_per_dollar;
+    const convertedAmount = usdAmount * toCurrency.rate_per_dollar;
+    
+    return `${convertedAmount.toFixed(2)} ${toCurrency.symbol || toCurrency.code || toCurrency.name}`;
+  };
+
+  // Format currency helper function
+  const formatCurrency = (amount, currencyId) => {
+    if (!amount) return "0";
+    const currency = getCurrencyInfo(currencyId);
+    const formattedAmount = amount.toLocaleString();
+    return `${formattedAmount} ${currency.symbol || currency.code || currency.name}`;
+  };
 
   const DetailRow = ({ label, value, isHighlight = false }) => (
     <View style={styles.detailRow}>
@@ -33,6 +165,17 @@ const OrderDetailsScreen = () => {
   const SectionHeader = ({ title }) => (
     <Text style={styles.sectionHeader}>{title}</Text>
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary || "#2a52be"} />
+          <Text style={styles.loadingText}>Loading order details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -66,11 +209,32 @@ const OrderDetailsScreen = () => {
         {/* Transaction Details */}
         <View style={styles.card}>
           <SectionHeader title="Transaction Details" />
-          <DetailRow label="Amount" value={order.amount} isHighlight={true} />
-          <DetailRow label="From Currency" value={order.fromCurrency} />
-          <DetailRow label="Receiver Currency" value={order.receiverCurrency} />
-          <DetailRow label="Receiver Place" value={order.receiverPlace} />
-          <DetailRow label="Bank" value={order.bank} />
+          <DetailRow 
+            label="Amount" 
+            value={formatCurrency(order.amount, order.fromCurrency)} 
+            isHighlight={true} 
+          />
+          <DetailRow 
+            label="From Currency" 
+            value={formatCurrencyDisplay(order.fromCurrency)} 
+          />
+          <DetailRow 
+            label="To Currency" 
+            value={formatCurrencyDisplay(order.receiverCurrency)} 
+          />
+          <DetailRow 
+            label="Converted Amount" 
+            value={calculateConversion(order.amount, order.fromCurrency, order.receiverCurrency)}
+            isHighlight={true}
+          />
+          <DetailRow 
+            label="Receiver Place" 
+            value={getPlaceName(order.receiverPlace || order.placeId)} 
+          />
+          <DetailRow 
+            label="Bank" 
+            value={getBankName(order.bank || order.bankId)} 
+          />
           <DetailRow label="Relationship" value={order.relationship} />
         </View>
 
@@ -108,7 +272,7 @@ const OrderDetailsScreen = () => {
         {/* Member Information (if available) */}
         {order.member && (
           <View style={styles.card}>
-            <SectionHeader title="Member Information" />
+            <SectionHeader title="Assigned Member" />
             <DetailRow label="Full Name" value={order.member.full_name} />
             <DetailRow label="Email" value={order.member.email} />
             <DetailRow label="Phone" value={order.member.phone_number} />
@@ -126,6 +290,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f6fa",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f6fa",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
   },
   header: {
     flexDirection: "row",

@@ -64,14 +64,14 @@ const Settings = ({ navigation }) => {
             </Text>
           </Pressable>
 
-          <Pressable
+          {/* <Pressable
             onPress={showCurrency}
             style={[cstyles.nav, currency && cstyles.activeNav]} // Apply activeNav only when currency is true
           >
             <Text style={[cstyles.textNav, currency && cstyles.activeTextNav]}>
               Currency
             </Text>
-          </Pressable>
+          </Pressable> */}
 
           <Pressable
             onPress={showBank}
