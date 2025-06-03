@@ -7,6 +7,7 @@ import {
   StyleSheet,
   RefreshControl,
   Pressable,
+  TouchableOpacity,
 } from "react-native";
 import Header from "../components/Header";
 import { AuthContext } from "../context/AuthContext";
@@ -20,8 +21,6 @@ const statusColors = {
   completed: "#4CAF50",
   failed: "#F44336",
 };
-
-
 
 const UserComp = () => {
   const navigation = useNavigation();
@@ -58,10 +57,12 @@ const UserComp = () => {
     fetchOrders();
   };
 
+  const handleCardPress = (order) => {
+    navigation.navigate("OrderDetailsUser", { order });
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f5f6fa" }}>
-
       <ScrollView
         style={{ paddingHorizontal: 10 }}
         refreshControl={
@@ -69,26 +70,6 @@ const UserComp = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-
-        <View>
-
-        </View>
-        {/* <Text style={styles.greeting}>
-          {user.is_member
-            ? "."
-            : user.is_admin
-            ? "."
-            : "."}
-        </Text> */}
-        
-        {/* New Order Button */}
-        {/* <Pressable 
-          style={styles.newOrderButton} 
-          onPress={() => navigation.navigate("RequestTransactionScreen")}
-        >
-          <Text style={styles.newOrderButtonText}>+ New Order</Text>
-        </Pressable> */}
-
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={styles.sectionTitle}>Your Orders</Text>
           <Pressable 
@@ -98,50 +79,59 @@ const UserComp = () => {
             <Text style={styles.newOrderButtonText}>+ New Order</Text>
           </Pressable>
         </View>
+        
         {loading ? (
           <ActivityIndicator size="large" color="#2a52be" style={{ marginTop: 30 }} />
         ) : orders.length === 0 ? (
           <Text style={styles.emptyText}>No orders found.</Text>
         ) : (
-          orders.map((order) => <View style={styles.card} key={order.id}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Order #{order.id}</Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: statusColors[order.status] || "#bbb" },
-                ]}
-              >
-                <Text style={styles.statusText}>{order.status.toUpperCase()}</Text>
+          orders.map((order) => (
+            <TouchableOpacity 
+              key={order.id}
+              style={styles.card}
+              onPress={() => handleCardPress(order)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Order #{order.id}</Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: statusColors[order.status] || "#bbb" },
+                  ]}
+                >
+                  <Text style={styles.statusText}>{order.status.toUpperCase()}</Text>
+                </View>
               </View>
-            </View>
-            <Text style={styles.amount}>
-              Amount: <Text style={{ fontWeight: "bold" }}>{order.amount}</Text>
-            </Text>
-            <Text style={styles.detail}>
-              Sender: <Text style={{ fontWeight: "bold" }}>{order.senderName}</Text>
-            </Text>
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <View>
-                <Text style={styles.detail}>
-                  Receiver: <Text style={{ fontWeight: "bold" }}>{order.receiverName}</Text>
-                </Text>
-                <Text style={styles.detail}>
-                  Bank: <Text style={{ fontWeight: "bold" }}>{order.bank}</Text>
-                </Text>
+              
+              <Text style={styles.amount}>
+                Amount: <Text style={{ fontWeight: "bold" }}>{order.amount}</Text>
+              </Text>
+              
+              <View style={styles.detailsRow}>
+                <View style={styles.detailsColumn}>
+                  <Text style={styles.detail}>
+                    Sender: <Text style={{ fontWeight: "bold" }}>{order.senderName}</Text>
+                  </Text>
+                  <Text style={styles.detail}>
+                    Receiver: <Text style={{ fontWeight: "bold" }}>{order.receiverName}</Text>
+                  </Text>
+                  <Text style={styles.detail}>
+                    Bank: <Text style={{ fontWeight: "bold" }}>{order.bank}</Text>
+                  </Text>
+                </View>
+                
+                <View style={styles.rightColumn}>
+                  <View style={styles.viewButton}>
+                    <Text style={styles.viewButtonText}>View Details</Text>
+                  </View>
+                  <Text style={styles.date}>
+                    {new Date(order.createdAt).toLocaleString()}
+                  </Text>
+                </View>
               </View>
-              {/* <View style={{ width: '40%' }}>
-                <Pressable style={{ backgroundColor: COLORS.primary3, width: 50, borderRadius: 20, padding: 2, marginLeft: '70%' }} onPress={() => navigation.navigate("OrderDetails",{order})}>
-                  <Text style={{ color: COLORS.primary, textAlign: 'center' }}>View</Text>
-                </Pressable>
-                <Text style={styles.date}>
-                  {new Date(order.createdAt).toLocaleString()}
-                </Text>
-              </View> */}
-            </View>
-
-          </View>)
+            </TouchableOpacity>
+          ))
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -217,13 +207,37 @@ const styles = StyleSheet.create({
   },
   amount: {
     fontSize: 16,
-    marginBottom: 4,
+    marginBottom: 8,
     color: "#2a52be",
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  detailsColumn: {
+    flex: 1,
+  },
+  rightColumn: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    minHeight: 60,
   },
   detail: {
     fontSize: 14,
     color: "#444",
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  viewButton: {
+    backgroundColor: COLORS?.primary3 || "#e3f2fd",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  viewButtonText: {
+    color: COLORS?.primary || "#2a52be",
+    fontSize: 12,
+    fontWeight: "600",
   },
   date: {
     fontSize: 12,

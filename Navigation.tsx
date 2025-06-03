@@ -27,7 +27,9 @@ import AllOrders from "./screens/AllOrders";
 import Admins from "./screens/Admins";
 import Transactions from "./screens/Transactions";
 import CompletedOrderAdmin from "./screens/CompletedOrderAdmin";
+import OrderScreenUser from "./screens/OrderScreenUser";
 import AdminPendingOrder from "./components/AdminPendingOrder";
+import OrderDetailsScreenUser from "./screens/OrderScreenUser";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -41,13 +43,22 @@ function StackNav() {
       <Stack.Screen name="About" component={About} />
       <Stack.Screen name="Balances" component={Balances} />
       <Stack.Screen name="Collections" component={Collections} />
-      <Stack.Screen name="CompletedOrderAdmin" component={CompletedOrderAdmin} />
+      <Stack.Screen
+        name="CompletedOrderAdmin"
+        component={CompletedOrderAdmin}
+      />
       <Stack.Screen name="CompletedOrder" component={CompletedOrder} />
       <Stack.Screen name="Commissions" component={Commissions} />
       <Stack.Screen name="Reports" component={Reports} />
       <Stack.Screen name="Distributed" component={Distributed} />
-      <Stack.Screen name="RequestTransactionScreen" component={RequestTransactionScreen} />
-      <Stack.Screen name="TransactionListScreen" component={TransactionListScreen} />
+      <Stack.Screen
+        name="RequestTransactionScreen"
+        component={RequestTransactionScreen}
+      />
+      <Stack.Screen
+        name="TransactionListScreen"
+        component={TransactionListScreen}
+      />
       <Stack.Screen name="OrderDetails" component={OrderDetails} />
       <Stack.Screen name="Users" component={Users} />
       <Stack.Screen name="Members" component={Members} />
@@ -59,6 +70,12 @@ function StackNav() {
       <Stack.Screen name="Home" component={TabNav} />
       <Stack.Screen name="Transactions" component={Transactions} />
       <Stack.Screen name="AdminPendingOrder" component={AdminPendingOrder} />
+  
+      <Stack.Screen
+        name="OrderDetailsUser"
+        component={OrderDetailsScreenUser}
+        
+      />
     </Stack.Navigator>
   );
 }
@@ -92,7 +109,11 @@ function TabNav() {
           tabBarLabel: "About",
           headerShown: false,
           tabBarIcon: ({ color }) => (
-            <Ionicons name="information-circle-outline" size={24} color={color} />
+            <Ionicons
+              name="information-circle-outline"
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
