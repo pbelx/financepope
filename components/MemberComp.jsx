@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,10 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Modal,
+  Alert,
+  SafeAreaView,
+  RefreshControl,
 } from "react-native";
 import { Card, Avatar, IconButton } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,54 +28,130 @@ import { COLORS } from "../theme";
 import { generateAxiosInstance } from "../shared/constants";
 import { AuthContext } from "../context/AuthContext";
 
+const statusColors = {
+  pending: "#FFD700",
+  completed: "#4CAF50",
+  failed: "#F44336",
+  approved: "#2196F3",
+  cancelled: "#F44336",
+};
+
 const MemberComp = () => {
   const [orders, setorders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
-  const [places, setPlaces] = useState([]); // Add places state to get bank data
+  const [places, setPlaces] = useState([]);
+  const [allBanks, setAllBanks] = useState([]);
+  const [currencies, setCurrencies] = useState([]);
   const navigation = useNavigation();
-  const [loading, setLoading] = useState(false);
+  const [componentLoading, setComponentLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { user } = useContext(AuthContext);
+  const [balance, setBalance] = useState(0);
 
-  // Function to get bank name by ID
-  const getBankNameById = (bankId) => {
-    if (!bankId || !places.length) return "N/A";
-
-    // Search through all places to find the bank with matching ID
-    for (const place of places) {
-      const bank = place.banks?.find((b) => b.id == bankId);
-      if (bank) {
-        return bank.name;
-      }
-    }
-    return `Bank ID: ${bankId}`; // Fallback if bank not found
+  // Helper function to get currency info by ID
+  const getCurrencyInfo = (currencyId) => {
+    if (!currencyId) return { name: "N/A", symbol: "", code: "" };
+    const currency = currencies.find(
+      (curr) => curr.id && curr.id.toString() === currencyId.toString()
+    );
+    return currency ? currency : { name: "N/A", symbol: "", code: "" };
   };
 
-  // Fetch places to get bank data
-  const fetchPlaces = async () => {
+  // Helper function to get bank name by ID
+  const getBankName = (bankId) => {
+    if (!bankId) return "N/A";
+    const bank = allBanks.find(
+      (bank) => bank.id && bank.id.toString() === bankId.toString()
+    );
+    return bank ? bank.name : "N/A";
+  };
+
+  // Format currency helper function
+  const formatCurrency = (amount, currencyId) => {
+    if (!amount) return "0";
+    const currency = getCurrencyInfo(currencyId);
+    if (currency.code) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: currency.code,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    }
+    const formattedAmount = amount.toLocaleString();
+    return `${formattedAmount} ${currency.symbol || currency.code || currency.name}`;
+  };
+
+  // Fetch all required data on component mount
+  const fetchAllData = async () => {
+    try {
+      setComponentLoading(true);
+      await Promise.all([
+        fetchPlacesData(),
+        fetchCurrencies(),
+      ]);
+    } catch (error) {
+      console.error("Error fetching initial data:", error);
+    } finally {
+      setComponentLoading(false);
+    }
+  };
+
+  // Fetch currencies
+  const fetchCurrencies = async () => {
     try {
       const axiosInstance = await generateAxiosInstance(true);
-      const res = await axiosInstance.get("/places");
-      if (res.data.status) {
-        setPlaces(res.data.payload);
+      const response = await axiosInstance.get("/currency/all");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setCurrencies(data.payload);
       }
     } catch (error) {
-      console.log("Error fetching places:", error);
+      console.error("Error fetching currencies:", error);
+    }
+  };
+
+  // Fetch places and extract banks
+  const fetchPlacesData = async () => {
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.get("/places");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setPlaces(data.payload);
+
+        // Extract all banks from all places
+        const banksFromPlaces = [];
+        data.payload.forEach((place) => {
+          if (place.banks && place.banks.length > 0) {
+            place.banks.forEach((bank) => {
+              if (!banksFromPlaces.find((b) => b.id === bank.id)) {
+                banksFromPlaces.push({
+                  ...bank,
+                  placeName: place.name,
+                });
+              }
+            });
+          }
+        });
+        setAllBanks(banksFromPlaces);
+      }
+    } catch (error) {
+      console.error("Error fetching places:", error);
     }
   };
 
   const fetchorders = async () => {
     try {
-      setLoading(true);
+      setComponentLoading(true);
       const axiosInstance = await generateAxiosInstance(true);
       let res = await axiosInstance.get("/order/all");
-      // console.log("order", res.data.payload);
       if (res.data.status) {
-        console.log("orders", res.data.payload);
         setorders(res.data.payload);
 
-        // Filter orders for current user with pending status
         const userOrders = res.data.payload.filter((order) => {
-          // Check if the order belongs to the current user (either as user or member)
           const belongsToUser =
             order.user?.id === user?.id || order.member?.id === user?.id;
           const isPending = order.status === "pending";
@@ -79,382 +159,266 @@ const MemberComp = () => {
         });
 
         setFilteredOrders(userOrders);
-        setLoading(false);
+        setComponentLoading(false);
+        setRefreshing(false);
       }
     } catch (error) {
       console.log(error);
-      setLoading(false);
+      setComponentLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchPlaces(); // Fetch places first to get bank data
-    fetchorders();
-  }, [user]);
-
-  const [balance, setBalance] = useState(0);
   const fetchbalance = async () => {
     try {
-      setLoading(true);
       const axiosInstance = await generateAxiosInstance(true);
       let res = await axiosInstance.post(`/collections/${user?.id}`);
-      console.log("balance", res.data.payload);
       if (res.data.status) {
-        // console.log("orders", res.data.payload);
         setBalance(res.data.payload);
-        setLoading(false);
       }
     } catch (error) {
       console.log(error);
-      setLoading(false);
     }
   };
 
   useEffect(() => {
+    fetchAllData();
+    fetchorders();
     fetchbalance();
-  }, []);
-  // Function to format date
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
+  }, [user]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchorders();
+    fetchbalance();
   };
 
-  //update order status
-  const updateOrderStatus = async (orderId, status) => {
-    try {
-      const axiosInstance = await generateAxiosInstance(true);
-      const res = await axiosInstance.put("/order/update", {
-        id: orderId,
-        status,
-      });
-      if (res.data.status) {
-        // Update the orders state with the new status
-        const updatedOrders = orders.map((order) =>
-          order.id === orderId ? { ...order, status } : order
-        );
-        setorders(updatedOrders);
-
-        // Update the filtered orders state
-        const updatedFilteredOrders = updatedOrders.filter((order) => {
-          const belongsToUser =
-            order.user?.id === user?.id || order.member?.id === user?.id;
-          const isPending = order.status === "pending";
-          return belongsToUser && isPending;
-        });
-        setFilteredOrders(updatedFilteredOrders);
-      }
-    } catch (error) {
-      console.log(error);
-    }
+  const handleCardPress = (order) => {
+    navigation.navigate("OrderScreenMember", { order });
   };
 
   return (
-    <View style={{ backgroundColor: "#fff", padding: 5 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <View>
-          <Text style={gstyles.gtitle}>Member Portal</Text>
-        </View>
-        <View>
-          <Text
-            style={{ fontWeight: "bold", fontSize: 28, color: COLORS.primary }}
-          >
-            {balance?.toLocaleString()}
-          </Text>
-          <Text>Available Balance</Text>
-        </View>
-      </View>
-
-      <View
-        style={{
-          flexDirection: "row",
-          marginTop: 10,
-          justifyContent: "space-between",
-        }}
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#f5f6fa" }}>
+      <ScrollView
+        style={{ paddingHorizontal: 10 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
       >
-        <Pressable
-          onPress={() => navigation.navigate("Balances")}
-          style={styles.memberActions}
-        >
-          <View style={styles.iconBox}>
-            <MaterialIcons
-              name="attach-money"
-              size={24}
-              style={{ color: "#fff" }}
-            />
+        <View style={{ backgroundColor: "#fff", padding: 15, borderRadius: 12, marginBottom: 15 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <View>
+              <Text style={[gstyles.gtitle, { color: COLORS.primary }]}>Member Portal</Text>
+              <Text style={{ color: "#666", fontSize: 14, marginTop: 4 }}>
+                Welcome back, {user?.full_name}
+              </Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text
+                style={{
+                  fontWeight: "bold",
+                  fontSize: 24,
+                  color: COLORS.primary,
+                }}
+              >
+                {balance?.toLocaleString()}
+              </Text>
+              <Text style={{ color: "#666", fontSize: 12 }}>Available Balance</Text>
+            </View>
           </View>
-          <Text style={styles.actionText}>Balances</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => navigation.navigate("Collections")}
-          style={styles.memberActions}
-        >
-          <View style={styles.iconBox}>
-            <FontAwesome6 name="money-bill-transfer" size={16} color="white" />
-          </View>
-          <Text style={styles.actionText}>Collections</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => navigation.navigate("Distributed")}
-          style={styles.memberActions}
-        >
-          <View style={styles.iconBox}>
-            <MaterialIcons name="send-to-mobile" size={16} color="white" />
-          </View>
-          <Text style={styles.actionText}>Distributions</Text>
-        </Pressable>
-      </View>
+        </View>
 
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Pressable
-          onPress={() => navigation.navigate("Commissions")}
-          style={styles.memberActions}
-        >
-          <View style={styles.iconBox}>
-            <FontAwesome6 name="money-bill-trend-up" size={16} color="white" />
-          </View>
-          <Text style={styles.actionText}>Commissions</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => navigation.navigate("CompletedOrder")}
-          style={styles.memberActions}
-        >
-          <View style={styles.iconBox}>
-            <MaterialIcons
-              name="check-circle"
-              size={16}
-              style={{ color: "#fff" }}
-            />
-          </View>
-          <Text style={styles.actionText}>Completed</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => navigation.navigate("Reports")}
-          style={styles.memberActions}
-        >
-          <View style={styles.iconBox}>
-            <MaterialIcons
-              name="auto-graph"
-              size={16}
-              style={{ color: "#fff" }}
-            />
-          </View>
-          <Text style={styles.actionText}>Reports</Text>
-        </Pressable>
-      </View>
-
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginTop: 20,
-        }}
-      >
-        <Text style={gstyles.gtitle}>My Pending Orders</Text>
-        <Text style={{ color: COLORS.gray, fontSize: 14 }}>
-          {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
-        </Text>
-      </View>
-
-      {loading ? (
         <View
           style={{
-            flex: 1,
-            justifyContent: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
             alignItems: "center",
-            marginTop: 50,
+            marginBottom: 15,
           }}
         >
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={{ marginTop: 10, color: COLORS.gray }}>
-            Loading orders...
+          <Text style={styles.sectionTitle}>My Pending Orders</Text>
+          <Text style={{ color: COLORS.gray, fontSize: 14 }}>
+            {filteredOrders.length} order
+            {filteredOrders.length !== 1 ? "s" : ""}
           </Text>
         </View>
-      ) : filteredOrders.length === 0 ? (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            marginTop: 50,
-          }}
-        >
-          <MaterialIcons name="inbox" size={48} color={COLORS.gray} />
-          <Text style={{ marginTop: 10, color: COLORS.gray, fontSize: 16 }}>
-            No pending orders found
-          </Text>
-        </View>
-      ) : (
-        filteredOrders.map((item) => {
-          return (
-            <ScrollView
-              horizontal={true}
-              showsHorizontalScrollIndicator={false}
-              key={item.id}
+
+        {componentLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Loading orders...</Text>
+          </View>
+        ) : filteredOrders.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <MaterialIcons name="inbox" size={48} color={COLORS.gray} />
+            <Text style={styles.emptyText}>No pending orders found</Text>
+            <Text style={styles.emptySubText}>
+              Orders assigned to you will appear here
+            </Text>
+          </View>
+        ) : (
+          filteredOrders.map((order) => (
+            <TouchableOpacity
+              key={order.id}
+              style={styles.card}
+              onPress={() => handleCardPress(order)}
+              activeOpacity={0.8}
             >
-              <View style={styles.card}>
-                <View style={{ flexDirection: "row" }}>
-                  <View style={{ width: 40, padding: 5 }}>
-                    <Text style={{ fontWeight: "bold", marginTop: 10 }}>
-                      #{item?.id}
-                    </Text>
-                  </View>
-                  <View style={{ width: 100, padding: 5 }}>
-                    <Text style={{ fontWeight: "bold", marginTop: 10 }}>
-                      {formatDate(item?.createdAt)}
-                    </Text>
-                  </View>
-                  <View style={{ width: 100, padding: 5 }}>
-                    <Text style={{ fontWeight: "bold", marginTop: 10 }}>
-                      ${item?.amount?.toLocaleString()}
-                    </Text>
-                  </View>
-                  <View style={{ width: 120, padding: 5 }}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      {item?.senderName}
-                    </Text>
-                    <Text style={{ color: COLORS.gray }}>From</Text>
-                  </View>
-                  <View style={{ width: 150, padding: 5 }}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      {item?.senderPhone}
-                    </Text>
-                    <Text style={{ color: COLORS.gray }}>From Phone</Text>
-                  </View>
-                  <View style={{ width: 120, padding: 5 }}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      {item?.receiverName}
-                    </Text>
-                    <Text style={{ color: COLORS.gray }}>Receiver</Text>
-                  </View>
-                  <View style={{ width: 150, padding: 5 }}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      {item?.receiverPhone}
-                    </Text>
-                    <Text style={{ color: COLORS.gray }}>Receiver Phone</Text>
-                  </View>
-                  <View style={{ width: 180, padding: 5 }}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      {item?.receiverAddress}
-                    </Text>
-                    <Text style={{ color: COLORS.gray }}>Receiver Address</Text>
-                  </View>
-                  <View style={{ width: 150, padding: 5 }}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      {getBankNameById(item?.bank)}
-                    </Text>
-                    <Text style={{ color: COLORS.gray }}>Receiver Bank</Text>
-                  </View>
-                  <View
-                    style={{
-                      width: 100,
-                      padding: 5,
-                      flexDirection: "row",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <Pressable
-                      style={styles.changeStatus}
-                      onPress={() => updateOrderStatus(item.id, "completed")}
-                    >
-                      <Text style={{ fontSize: 15, color: "green" }}>
-                        Complete
-                      </Text>
-                    </Pressable>
-                  </View>
-                  <Pressable>
-                    <View style={{ width: 50, padding: 5 }}>
-                      <Text style={{ color: COLORS.gray }}>Copy</Text>
-                    </View>
-                  </Pressable>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Order #{order.id}</Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: statusColors[order.status] || "#bbb" },
+                  ]}
+                >
+                  <Text style={styles.statusText}>{order.status.toUpperCase()}</Text>
                 </View>
               </View>
-            </ScrollView>
-          );
-        })
-      )}
-    </View>
+
+              <Text style={styles.amount}>
+                Amount: <Text style={{ fontWeight: "bold" }}>
+                  {formatCurrency(order.amount, order.fromCurrency)}
+                </Text>
+              </Text>
+
+              <View style={styles.detailsRow}>
+                <View style={styles.detailsColumn}>
+                  <Text style={styles.detail}>
+                    Sender: <Text style={{ fontWeight: "bold" }}>{order.senderName}</Text>
+                  </Text>
+                  <Text style={styles.detail}>
+                    Receiver: <Text style={{ fontWeight: "bold" }}>{order.receiverName}</Text>
+                  </Text>
+                  <Text style={styles.detail}>
+                    Bank: <Text style={{ fontWeight: "bold" }}>{getBankName(order.bank)}</Text>
+                  </Text>
+                </View>
+
+                <View style={styles.rightColumn}>
+                  <View style={styles.viewButton}>
+                    <Text style={styles.viewButtonText}>View Details</Text>
+                  </View>
+                  <Text style={styles.date}>
+                    {new Date(order.createdAt).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 export default MemberComp;
 
 const styles = StyleSheet.create({
-  card: {
-    margin: 5,
-    borderRadius: 10,
-    padding: 15,
-    backgroundColor: "#f5f5f5",
-    width: 1300,
-    borderWidth: 1,
-    borderColor: "#e1e1e1",
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2a52be",
   },
-  iconBox: {
-    backgroundColor: COLORS.primary,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    flexDirection: "row",
+  loadingContainer: {
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
-    marginLeft: "30%",
+    marginTop: 50,
   },
-  actionText: {
-    color: COLORS.primary,
-    textAlign: "center",
-    fontSize: 12,
-  },
-  memberActions: {
-    backgroundColor: COLORS.primary3,
-    width: "30%",
-    paddingHorizontal: 8,
-    paddingVertical: 15,
-    margin: 5,
-    borderRadius: 10,
-  },
-  changeStatus: {
-    paddingHorizontal: 8,
-    borderRadius: 5,
-    backgroundColor: COLORS.primary3,
-    paddingVertical: 2,
-    margin: 1,
-  },
-  memberActions2: {
-    backgroundColor: COLORS.primary,
-    width: "30%",
-    padding: 10,
-    margin: 5,
-    borderRadius: 10,
-  },
-  detailsContainer: {
-    padding: 16,
-    flex: 1,
-  },
-  detailsCard: {
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  amount: {
-    fontSize: 22,
-    fontWeight: "bold",
-  },
-  input: {
-    height: 40,
-    borderColor: "gray",
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 10,
-    paddingHorizontal: 10,
-  },
-  label: {
+  loadingText: {
+    marginTop: 10,
+    color: COLORS.gray,
     fontSize: 16,
-    marginBottom: 5,
   },
-  buttonContainer: {
+  emptyContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 50,
+  },
+  emptyText: {
+    marginTop: 10,
+    color: COLORS.gray,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  emptySubText: {
+    marginTop: 5,
+    color: COLORS.gray,
+    fontSize: 14,
+    textAlign: "center",
+  },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 20,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#222",
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: "#000",
+    fontWeight: "bold",
+    fontSize: 10,
+  },
+  amount: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: "#2a52be",
+  },
+  detailsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  detailsColumn: {
+    flex: 1,
+  },
+  rightColumn: {
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    minHeight: 60,
+  },
+  detail: {
+    fontSize: 14,
+    color: "#444",
+    marginBottom: 4,
+  },
+  viewButton: {
+    backgroundColor: COLORS?.primary3 || "#e3f2fd",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  viewButtonText: {
+    color: COLORS?.primary || "#2a52be",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  date: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 8,
+    textAlign: "right",
   },
 });

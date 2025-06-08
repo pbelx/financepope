@@ -31,7 +31,7 @@ const removeStorageItem = async (key) => {
 export const HOST_URL = "https://finance.flflstore.com";
 // export const HOST_URL = "http://192.168.102.234:3001";
 // export const HOST_URL = "http://192.168.100.5:3001";
-// export const HOST_URL = "http://192.168.100.21:3001";
+//  export const HOST_URL = "http://192.168.100.20:3001";
 export const UPLOADS_URL = HOST_URL + "/useruploads/";
 export const IMAGE_PLACEHOLDER =
   "https://placehold.jp/3d4070/ffffff/150x150.png?text=No%20Image";

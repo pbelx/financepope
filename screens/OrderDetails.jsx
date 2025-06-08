@@ -21,9 +21,33 @@ import gstyles from "../styles";
 import { generateAxiosInstance } from "../shared/constants";
 
 const OrderDetails = ({ route }) => {
+  // State declarations
+  const [status, setStatus] = useState("pending");
+  const [message, setMessage] = useState("");
+  const [members, setMembers] = useState([]);
+  const [places, setPlaces] = useState([]);
+  const [allBanks, setAllBanks] = useState([]);
+  const [currencies, setCurrencies] = useState([]);
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [currentOrder, setCurrentOrder] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [posting, setPosting] = useState(false);
+
+  const navigation = useNavigation();
+  
   // Get the order data from navigation params with error handling
   const order = route?.params?.order || null;
   
+  // Initialize states with order data
+  useEffect(() => {
+    if (order) {
+      setStatus(order?.status || "pending");
+      setSelectedMemberId(order?.member?.id || null);
+      setCurrentOrder(order);
+    }
+  }, [order]);
+
   // If no order is provided, show error or navigate back
   if (!order) {
     return (
@@ -38,24 +62,13 @@ const OrderDetails = ({ route }) => {
       </View>
     );
   }
-  const [status, setStatus] = useState(order?.status || "pending");
-  const [message, setMessage] = useState("");
-  const [members, setMembers] = useState([]);
-  const [places, setPlaces] = useState([]);
-  const [allBanks, setAllBanks] = useState([]);
-  const [currencies, setCurrencies] = useState([]); // Add currencies state
-  const [selectedMemberId, setSelectedMemberId] = useState(
-    order?.member?.id || null
-  );
-  const [loading, setLoading] = useState(false);
-  const navigation = useNavigation();
-  const [currentOrder, setCurrentOrder] = useState(order);
 
   // Fetch all required data on component mount
   useEffect(() => {
     fetchMembers();
     fetchPlaces();
-    fetchCurrencies(); // Add currency fetching
+    fetchCurrencies();
+    fetchMessages();
   }, []);
 
   const fetchMembers = async () => {
@@ -78,7 +91,18 @@ const OrderDetails = ({ route }) => {
     }
   };
 
-  // Fetch currencies
+  const fetchMessages = async () => {
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      let res = await axiosInstance.get(`/messages/${order.id}`);
+      if (res.data.status) {
+        setMessages(res.data.payload);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   const fetchCurrencies = async () => {
     try {
       const axiosInstance = await generateAxiosInstance(true);
@@ -95,7 +119,6 @@ const OrderDetails = ({ route }) => {
     }
   };
 
-  // Fetch places and extract banks
   const fetchPlaces = async () => {
     try {
       const axiosInstance = await generateAxiosInstance(true);
@@ -105,16 +128,14 @@ const OrderDetails = ({ route }) => {
       if (data.status && data.payload) {
         setPlaces(data.payload);
         
-        // Extract all banks from all places
         const banksFromPlaces = [];
         data.payload.forEach(place => {
           if (place.banks && place.banks.length > 0) {
             place.banks.forEach(bank => {
-              // Only add if not already in the array (avoid duplicates)
               if (!banksFromPlaces.find(b => b.id === bank.id)) {
                 banksFromPlaces.push({
                   ...bank,
-                  placeName: place.name // Add place name for context if needed
+                  placeName: place.name
                 });
               }
             });
@@ -127,28 +148,45 @@ const OrderDetails = ({ route }) => {
     }
   };
 
-  // Helper function to get bank name by ID
+  const postMessages = async () => {
+    try {
+      setPosting(true);
+      const axiosInstance = await generateAxiosInstance(true);
+      let formdata = {
+        orderId: order.id,
+        message: message,
+      };
+      let res = await axiosInstance.post("messages", formdata);
+      if (res.data.status) {
+        setPosting(false);
+        setMessage("");
+        fetchMessages();
+      }
+    } catch (error) {
+      console.log(error);
+      setPosting(false);
+    }
+  };
+
+  // Helper functions
   const getBankName = (bankId) => {
     if (!bankId) return 'N/A';
     const bank = allBanks.find(bank => bank.id && bank.id.toString() === bankId.toString());
     return bank ? bank.name : 'N/A';
   };
 
-  // Helper function to get place name by ID
   const getPlaceName = (placeId) => {
     if (!placeId) return 'N/A';
     const place = places.find(place => place.id && place.id.toString() === placeId.toString());
     return place ? place.name : 'N/A';
   };
 
-  // Helper function to get currency info by ID
   const getCurrencyInfo = (currencyId) => {
     if (!currencyId) return { name: 'N/A', symbol: '', code: '' };
     const currency = currencies.find(curr => curr.id && curr.id.toString() === currencyId.toString());
     return currency ? currency : { name: 'N/A', symbol: '', code: '' };
   };
 
-  // Format currency with symbol/code
   const formatCurrencyDisplay = (currencyId) => {
     const currency = getCurrencyInfo(currencyId);
     if (currency.symbol) {
@@ -159,7 +197,6 @@ const OrderDetails = ({ route }) => {
     return currency.name;
   };
 
-  // Enhanced conversion calculation using actual rates
   const calculateConversion = (amount, fromCurrencyId, toCurrencyId) => {
     const fromCurrency = getCurrencyInfo(fromCurrencyId);
     const toCurrency = getCurrencyInfo(toCurrencyId);
@@ -168,14 +205,12 @@ const OrderDetails = ({ route }) => {
       return "Rate not available";
     }
 
-    // Convert to USD first, then to target currency
     const usdAmount = amount / fromCurrency.rate_per_dollar;
     const convertedAmount = usdAmount * toCurrency.rate_per_dollar;
     
     return `${convertedAmount.toFixed(2)} ${toCurrency.symbol || toCurrency.code || toCurrency.name}`;
   };
 
-  // Handle member assignment
   const handleAssignMember = async () => {
     if (!selectedMemberId) {
       Alert.alert("Error", "Please select a member to assign");
@@ -193,11 +228,9 @@ const OrderDetails = ({ route }) => {
       const data = response.data;
 
       if (data.status) {
-        // Update the local order state with the response data
         if (data.payload) {
           setCurrentOrder(data.payload);
         } else {
-          // If the API doesn't return the updated order, update manually
           const selectedMember = members.find(
             (member) => member.id === selectedMemberId
           );
@@ -206,10 +239,7 @@ const OrderDetails = ({ route }) => {
             member: selectedMember,
           }));
         }
-
         Alert.alert("Success", "Member assigned successfully");
-        // Don't navigate back immediately - let user see the updated UI
-        // navigation.goBack(); // Remove or comment this out
       } else {
         Alert.alert("Error", data.payload || "Failed to assign member");
       }
@@ -220,14 +250,13 @@ const OrderDetails = ({ route }) => {
       setLoading(false);
     }
   };
-  // Format date helper function
+
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
     return date.toLocaleDateString();
   };
 
-  // Format currency helper function
   const formatCurrency = (amount, currencyId) => {
     if (!amount) return "0";
     const currency = getCurrencyInfo(currencyId);
@@ -235,7 +264,6 @@ const OrderDetails = ({ route }) => {
     return `${formattedAmount} ${currency.symbol || currency.code || currency.name}`;
   };
 
-  // Get status color
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "completed":
@@ -250,7 +278,22 @@ const OrderDetails = ({ route }) => {
     }
   };
 
-  // Render member item
+  const renderMessage = (message) => {
+    const isUserMessage = message.sender === "user"; // Adjust this based on your message structure
+  
+    return (
+      <View
+        key={message.id}
+        style={[
+          styles.messageContainer,
+          isUserMessage ? styles.userMessage : styles.memberMessage,
+        ]}
+      >
+        <Text style={styles.messageText}>{message.message}</Text>
+      </View>
+    );
+  };
+
   const renderMemberItem = ({ item }) => (
     <TouchableOpacity
       style={styles.memberItem}
@@ -271,15 +314,6 @@ const OrderDetails = ({ route }) => {
     </TouchableOpacity>
   );
 
-  // Prepare data for FlatList including all sections
-  const flatListData = [
-    { type: "header" },
-    { type: "messages" },
-    { type: "status" },
-    { type: "members" },
-    { type: "info" },
-  ];
-
   // Render different sections based on type
   const renderSection = ({ item }) => {
     switch (item.type) {
@@ -288,7 +322,7 @@ const OrderDetails = ({ route }) => {
           <View style={styles.card}>
             <Pressable
               style={{ paddingVertical: 5 }}
-              onPress={() => navigation.navigate("Home")}
+              onPress={() => navigation.goBack()}
             >
               <Ionicons
                 name="arrow-back-sharp"
@@ -298,9 +332,7 @@ const OrderDetails = ({ route }) => {
               />
             </Pressable>
 
-            <View
-              style={{ flexDirection: "row", justifyContent: "space-between" }}
-            >
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <View style={{ flex: 1, marginRight: 10 }}>
                 <Text style={{ fontWeight: "bold", fontSize: 17 }}>Sender</Text>
                 <Text style={styles.detail}>
@@ -396,53 +428,20 @@ const OrderDetails = ({ route }) => {
         return (
           <View style={styles.card}>
             <Text style={{ fontSize: 18, fontWeight: "bold" }}>Messages</Text>
-            {messages.map((message) => {
-              return (
-                <View
-                  key={message.id}
-                  style={{
-                    padding: 10,
-                    backgroundColor: COLORS.primary,
-                    margin: 10,
-                    width: "70%",
-                    borderRadius: 10,
-                  }}
-                >
-                  <Text style={{ color: "#fff" }}>{message.message}</Text>
-                </View>
-              );
-            })}
+            {messages.map(renderMessage)}
 
-            <View
-              style={{
-                padding: 10,
-                backgroundColor: COLORS.primary2,
-                width: "70%",
-                marginLeft: "30%",
-                marginTop: 10,
-                marginRight: 10,
-                marginBottom: 10,
-                borderRadius: 10,
-              }}
-            ></View>
-            <View style={{ flexDirection: "row" }}>
-              <View style={{ width: "90%" }}>
-                <TextInput
-                  style={styles.input}
-                  value={message}
-                  onChangeText={setMessage}
-                  placeholder="Enter message"
-                />
-              </View>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={message}
+                onChangeText={setMessage}
+                placeholder="Enter message"
+              />
               {posting ? (
                 <ActivityIndicator />
               ) : (
-                <Pressable onPress={postmessages} style={{ marginLeft: 10 }}>
-                  <Ionicons
-                    name="send"
-                    size={24}
-                    style={{ color: COLORS.primary }}
-                  />
+                <Pressable onPress={postMessages} style={styles.sendButton}>
+                  <Ionicons name="send" size={24} style={{ color: COLORS.primary }} />
                 </Pressable>
               )}
             </View>
@@ -549,36 +548,12 @@ const OrderDetails = ({ route }) => {
                 >
                   Select Member:
                 </Text>
-                {members.map((member) => (
-                  <TouchableOpacity
-                    key={member.id}
-                    style={styles.memberItem}
-                    onPress={() => setSelectedMemberId(member.id)}
-                  >
-                    <View style={styles.memberInfo}>
-                      <Text style={styles.memberName}>{member.full_name}</Text>
-                      <Text style={styles.memberEmail}>{member.email}</Text>
-                      <Text style={styles.memberPhone}>
-                        {member.phone_number}
-                      </Text>
-                    </View>
-                    <View style={styles.checkbox}>
-                      <Ionicons
-                        name={
-                          selectedMemberId === member.id
-                            ? "checkbox"
-                            : "checkbox-outline"
-                        }
-                        size={24}
-                        color={
-                          selectedMemberId === member.id
-                            ? COLORS.primary
-                            : "#ccc"
-                        }
-                      />
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                <FlatList
+                  data={members}
+                  renderItem={renderMemberItem}
+                  keyExtractor={(item) => item.id.toString()}
+                  style={styles.membersList}
+                />
 
                 <TouchableOpacity
                   style={[
@@ -634,49 +609,15 @@ const OrderDetails = ({ route }) => {
     }
   };
 
-  const [messages, setmessages] = useState([]);
-
-  const fetchmessages = async () => {
-    try {
-      const axiosInstance = await generateAxiosInstance(true);
-      let res = await axiosInstance.get(`/messages/${order.id}`);
-      if (res.data.status) {
-        console.log("messages", res.data.payload);
-        setmessages(res.data.payload);
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  useEffect(() => {
-    fetchmessages();
-  }, []);
-  const [posting, setPosting] = useState(false);
-  const postmessages = async () => {
-    try {
-      setPosting(true);
-      const axiosInstance = await generateAxiosInstance(true);
-      let formdata = {
-        orderId: order.id,
-        message: message,
-      };
-      let res = await axiosInstance.post("messages", formdata);
-      // console.log("res", formdata);
-      if (res.data.status) {
-        setPosting(false);
-        setMessage("");
-        fetchmessages();
-      }
-    } catch (error) {
-      console.log(error);
-      setPosting(false);
-    }
-  };
-
   return (
     <FlatList
-      data={flatListData}
+      data={[
+        { type: "header" },
+        { type: "messages" },
+        { type: "status" },
+        { type: "members" },
+        { type: "info" },
+      ]}
       renderItem={renderSection}
       keyExtractor={(item, index) => `${item.type}_${index}`}
       style={styles.detailsContainer}
@@ -684,8 +625,6 @@ const OrderDetails = ({ route }) => {
     />
   );
 };
-
-export default OrderDetails;
 
 const styles = StyleSheet.create({
   container: {
@@ -722,11 +661,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.primary2,
   },
-  detailsCard: {
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
   amount: {
     fontSize: 22,
     fontWeight: "bold",
@@ -743,6 +677,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginBottom: 10,
     paddingHorizontal: 10,
+    flex: 1,
   },
   label: {
     fontSize: 16,
@@ -823,4 +758,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  messageContainer: {
+    padding: 10,
+    margin: 10,
+    borderRadius: 10,
+    maxWidth: "70%",
+  },
+  userMessage: {
+    backgroundColor: COLORS.primary,
+    alignSelf: "flex-end",
+  },
+  memberMessage: {
+    backgroundColor: COLORS.primary2,
+    alignSelf: "flex-start",
+  },
+  messageText: {
+    color: "#fff",
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  sendButton: {
+    marginLeft: 10,
+  },
 });
+
+export default OrderDetails;

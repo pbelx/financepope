@@ -30,6 +30,7 @@ import CompletedOrderAdmin from "./screens/CompletedOrderAdmin";
 import OrderScreenUser from "./screens/OrderScreenUser";
 import AdminPendingOrder from "./components/AdminPendingOrder";
 import OrderDetailsScreenUser from "./screens/OrderScreenUser";
+import OrderDetailsScreenMember from "./screens/OrderScreenMember.jsx";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -70,6 +71,7 @@ function StackNav() {
       <Stack.Screen name="Home" component={TabNav} />
       <Stack.Screen name="Transactions" component={Transactions} />
       <Stack.Screen name="AdminPendingOrder" component={AdminPendingOrder} />
+      <Stack.Screen name="OrderScreenMember" component={OrderDetailsScreenMember} />
   
       <Stack.Screen
         name="OrderDetailsUser"
