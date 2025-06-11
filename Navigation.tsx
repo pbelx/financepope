@@ -30,7 +30,8 @@ import CompletedOrderAdmin from "./screens/CompletedOrderAdmin";
 import OrderScreenUser from "./screens/OrderScreenUser";
 import AdminPendingOrder from "./components/AdminPendingOrder";
 import OrderDetailsScreenUser from "./screens/OrderScreenUser";
-import OrderDetailsScreenMember from "./screens/OrderScreenMember.jsx";
+import OrderDetailsScreenMember from "./screens/OrderScreenMember";
+import FloatScreenMember from "./screens/FloatScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -42,8 +43,8 @@ function StackNav() {
       <Stack.Screen name="SignUp" component={SignUp} />
       <Stack.Screen name="Reset" component={Reset} />
       <Stack.Screen name="About" component={About} />
-      <Stack.Screen name="Balances" component={Balances} />
-      <Stack.Screen name="Collections" component={Collections} />
+      {/* <Stack.Screen name="Balances" component={Balances} /> */}
+      {/* <Stack.Screen name="Collections" component={Collections} /> */}
       <Stack.Screen
         name="CompletedOrderAdmin"
         component={CompletedOrderAdmin}
@@ -52,6 +53,7 @@ function StackNav() {
       <Stack.Screen name="Commissions" component={Commissions} />
       <Stack.Screen name="Reports" component={Reports} />
       <Stack.Screen name="Distributed" component={Distributed} />
+      <Stack.Screen name="FloatScreen" component={FloatScreenMember} />
       <Stack.Screen
         name="RequestTransactionScreen"
         component={RequestTransactionScreen}
@@ -64,7 +66,7 @@ function StackNav() {
       <Stack.Screen name="Users" component={Users} />
       <Stack.Screen name="Members" component={Members} />
       <Stack.Screen name="Settings" component={Settings} />
-      <Stack.Screen name="Messages" component={Messages} />
+      {/* <Stack.Screen name="Messages" component={Messages} /> */}
       <Stack.Screen name="AllOrders" component={AllOrders} />
       <Stack.Screen name="Collected" component={Collected} />
       <Stack.Screen name="Admin" component={Admins} />

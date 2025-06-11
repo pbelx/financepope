@@ -99,31 +99,31 @@ const Header = () => {
                 <AntDesign name="setting" size={20} color="black" />
                 <Text style={{ fontSize: 16, marginLeft: 20 }}>Settings</Text>
               </Pressable>
-
+{/* 
               <Pressable
                 onPress={() => navigation.navigate("Messages")}
                 style={{ padding: 5, margin: 5, flexDirection: "row" }}
               >
                 <AntDesign name="message1" size={20} color="black" />
                 <Text style={{ fontSize: 16, marginLeft: 20 }}>Messages</Text>
-              </Pressable>
+              </Pressable> */}
 
-              <Pressable
+              {/* <Pressable
                 onPress={() => navigation.navigate("AllOrders")}
                 style={{ padding: 5, margin: 5, flexDirection: "row" }}
               >
                 <Ionicons name="gift-outline" size={20} color="black" />
                 <Text style={{ fontSize: 16, marginLeft: 20 }}>All Orders</Text>
-              </Pressable>
+              </Pressable> */}
 
-              <Pressable
+              {/* <Pressable
                 onPress={() => navigation.navigate("Collected")}
                 style={{ padding: 5, margin: 5, flexDirection: "row" }}
               >
                 <MaterialIcons name="collections" size={20} color="black" />
                 <Text style={{ fontSize: 16, marginLeft: 20 }}>Collected</Text>
               </Pressable>
-
+ */}
 
               <Pressable
                 onPress={() => navigation.navigate("Admin")}
@@ -133,21 +133,21 @@ const Header = () => {
                 <Text style={{ fontSize: 16, marginLeft: 20 }}>Admin</Text>
               </Pressable>
 
-              <Pressable
+              {/* <Pressable
                 onPress={() => navigation.navigate("Balances")}
                 style={{ padding: 5, margin: 5, flexDirection: "row" }}
               >
                 <MaterialIcons name="money-off" size={20} color="black" />
                 <Text style={{ fontSize: 16, marginLeft: 20 }}>Balances</Text>
-              </Pressable>
+              </Pressable> */}
 
-              <Pressable
+              {/* <Pressable
                 onPress={() => navigation.navigate("Commissions")}
                 style={{ padding: 5, margin: 5, flexDirection: "row" }}
               >
                 <MaterialIcons name="money" size={20} color="black" />
                 <Text style={{ fontSize: 16, marginLeft: 20 }}>Commissions</Text>
-              </Pressable>
+              </Pressable> */}
 
               <Pressable
                 onPress={() => navigation.navigate("AdminPendingOrder")}

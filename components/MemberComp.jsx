@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
+// import { Ionicons } from "@expo/vector-icons";
 import {
   View,
   Text,
@@ -79,17 +80,16 @@ const MemberComp = () => {
       }).format(amount);
     }
     const formattedAmount = amount.toLocaleString();
-    return `${formattedAmount} ${currency.symbol || currency.code || currency.name}`;
+    return `${formattedAmount} ${
+      currency.symbol || currency.code || currency.name
+    }`;
   };
 
   // Fetch all required data on component mount
   const fetchAllData = async () => {
     try {
       setComponentLoading(true);
-      await Promise.all([
-        fetchPlacesData(),
-        fetchCurrencies(),
-      ]);
+      await Promise.all([fetchPlacesData(), fetchCurrencies()]);
     } catch (error) {
       console.error("Error fetching initial data:", error);
     } finally {
@@ -184,7 +184,7 @@ const MemberComp = () => {
   useEffect(() => {
     fetchAllData();
     fetchorders();
-    fetchbalance();
+    // fetchbalance();
   }, [user]);
 
   const onRefresh = () => {
@@ -206,16 +206,31 @@ const MemberComp = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ backgroundColor: "#fff", padding: 15, borderRadius: 12, marginBottom: 15 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <View
+          style={{
+            backgroundColor: "#fff",
+            padding: 15,
+            borderRadius: 12,
+            marginBottom: 15,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <View>
-              <Text style={[gstyles.gtitle, { color: COLORS.primary }]}>Member Portal</Text>
+              <Text style={[gstyles.gtitle, { color: COLORS.primary }]}>
+                Member Portal
+              </Text>
               <Text style={{ color: "#666", fontSize: 14, marginTop: 4 }}>
                 Welcome back, {user?.full_name}
               </Text>
             </View>
             <View style={{ alignItems: "flex-end" }}>
-              <Text
+              {/* <Text
                 style={{
                   fontWeight: "bold",
                   fontSize: 24,
@@ -223,8 +238,24 @@ const MemberComp = () => {
                 }}
               >
                 {balance?.toLocaleString()}
-              </Text>
-              <Text style={{ color: "#666", fontSize: 12 }}>Available Balance</Text>
+              </Text> */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginTop: 10,
+                }}
+                onPress={() => navigation.navigate("FloatScreen" ,{ userId:user?.id })}
+              >
+                <Ionicons name="cash" size={20} color={COLORS.primary} />
+                <Text
+                  style={{ color: COLORS.primary, fontSize: 16, marginLeft: 5 }}
+                >
+                  My Float
+                </Text>
+              </TouchableOpacity>
+
+              <Text style={{ color: "#666", fontSize: 12 }}>Float</Text>
             </View>
           </View>
         </View>
@@ -273,12 +304,15 @@ const MemberComp = () => {
                     { backgroundColor: statusColors[order.status] || "#bbb" },
                   ]}
                 >
-                  <Text style={styles.statusText}>{order.status.toUpperCase()}</Text>
+                  <Text style={styles.statusText}>
+                    {order.status.toUpperCase()}
+                  </Text>
                 </View>
               </View>
 
               <Text style={styles.amount}>
-                Amount: <Text style={{ fontWeight: "bold" }}>
+                Amount:{" "}
+                <Text style={{ fontWeight: "bold" }}>
                   {formatCurrency(order.amount, order.fromCurrency)}
                 </Text>
               </Text>
@@ -286,13 +320,22 @@ const MemberComp = () => {
               <View style={styles.detailsRow}>
                 <View style={styles.detailsColumn}>
                   <Text style={styles.detail}>
-                    Sender: <Text style={{ fontWeight: "bold" }}>{order.senderName}</Text>
+                    Sender:{" "}
+                    <Text style={{ fontWeight: "bold" }}>
+                      {order.senderName}
+                    </Text>
                   </Text>
                   <Text style={styles.detail}>
-                    Receiver: <Text style={{ fontWeight: "bold" }}>{order.receiverName}</Text>
+                    Receiver:{" "}
+                    <Text style={{ fontWeight: "bold" }}>
+                      {order.receiverName}
+                    </Text>
                   </Text>
                   <Text style={styles.detail}>
-                    Bank: <Text style={{ fontWeight: "bold" }}>{getBankName(order.bank)}</Text>
+                    Bank:{" "}
+                    <Text style={{ fontWeight: "bold" }}>
+                      {getBankName(order.bank)}
+                    </Text>
                   </Text>
                 </View>
 

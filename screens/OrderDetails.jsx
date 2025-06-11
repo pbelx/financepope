@@ -34,17 +34,24 @@ const OrderDetails = ({ route }) => {
   const [messages, setMessages] = useState([]);
   const [posting, setPosting] = useState(false);
 
+  // NEW STATES FOR COLLECTIONS
+  const [collections, setCollections] = useState([]);
+  const [selectedCollectionCurrency, setSelectedCollectionCurrency] = useState(null);
+  const [creatingCollection, setCreatingCollection] = useState(false);
+
   const navigation = useNavigation();
-  
+
   // Get the order data from navigation params with error handling
   const order = route?.params?.order || null;
-  
+
   // Initialize states with order data
   useEffect(() => {
     if (order) {
       setStatus(order?.status || "pending");
       setSelectedMemberId(order?.member?.id || null);
       setCurrentOrder(order);
+      // Set initial selected collection currency to the order's 'from' currency
+      setSelectedCollectionCurrency(order?.fromCurrency || null);
     }
   }, [order]);
 
@@ -53,7 +60,7 @@ const OrderDetails = ({ route }) => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>No order data found</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
@@ -69,6 +76,7 @@ const OrderDetails = ({ route }) => {
     fetchPlaces();
     fetchCurrencies();
     fetchMessages();
+    fetchCollectionsForOrderUser(); // NEW: Fetch collections for the order's user
   }, []);
 
   const fetchMembers = async () => {
@@ -127,7 +135,7 @@ const OrderDetails = ({ route }) => {
 
       if (data.status && data.payload) {
         setPlaces(data.payload);
-        
+
         const banksFromPlaces = [];
         data.payload.forEach(place => {
           if (place.banks && place.banks.length > 0) {
@@ -148,6 +156,35 @@ const OrderDetails = ({ route }) => {
     }
   };
 
+  // NEW: Fetch collections related to the order's user
+  const fetchCollectionsForOrderUser = async () => {
+    try {
+      if (!order?.userId) { // Assuming order has a userId or you can derive it
+        console.warn("No userId available for fetching collections.");
+        return;
+      }
+      setLoading(true);
+      const axiosInstance = await generateAxiosInstance(true);
+      // Modify this if your backend allows fetching collections by orderId
+      // For now, fetching by userId of the order
+      const response = await axiosInstance.get(`/collections/member/${order.userId}`);
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setCollections(data.payload);
+      } else {
+        console.error("Failed to fetch collections:", data.payload);
+        Alert.alert("Error", "Failed to fetch collections");
+      }
+    } catch (error) {
+      console.error("Error fetching collections:", error);
+      Alert.alert("Error", "Failed to fetch collections");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   const postMessages = async () => {
     try {
       setPosting(true);
@@ -167,6 +204,38 @@ const OrderDetails = ({ route }) => {
       setPosting(false);
     }
   };
+
+  // NEW: Handle Create Collection
+  const handleCreateNewCollection = async () => {
+    if (!order?.amount || !order?.userId || !selectedCollectionCurrency) {
+      Alert.alert("Error", "Missing amount, user ID, or currency for collection.");
+      return;
+    }
+
+    try {
+      setCreatingCollection(true);
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.post("/collections", {
+        amount: order.amount,
+        userId: order.userId, // Assuming the collection is for the user who made the order
+        currencyId: selectedCollectionCurrency,
+      });
+
+      const data = response.data;
+      if (data.status) {
+        Alert.alert("Success", "Collection created successfully!");
+        fetchCollectionsForOrderUser(); // Refresh collections list
+      } else {
+        Alert.alert("Error", data.payload || "Failed to create collection.");
+      }
+    } catch (error) {
+      console.error("Error creating collection:", error);
+      Alert.alert("Error", "Failed to create collection.");
+    } finally {
+      setCreatingCollection(false);
+    }
+  };
+
 
   // Helper functions
   const getBankName = (bankId) => {
@@ -200,14 +269,14 @@ const OrderDetails = ({ route }) => {
   const calculateConversion = (amount, fromCurrencyId, toCurrencyId) => {
     const fromCurrency = getCurrencyInfo(fromCurrencyId);
     const toCurrency = getCurrencyInfo(toCurrencyId);
-    
+
     if (!fromCurrency.rate_per_dollar || !toCurrency.rate_per_dollar) {
       return "Rate not available";
     }
 
     const usdAmount = amount / fromCurrency.rate_per_dollar;
     const convertedAmount = usdAmount * toCurrency.rate_per_dollar;
-    
+
     return `${convertedAmount.toFixed(2)} ${toCurrency.symbol || toCurrency.code || toCurrency.name}`;
   };
 
@@ -280,7 +349,7 @@ const OrderDetails = ({ route }) => {
 
   const renderMessage = (message) => {
     const isUserMessage = message.sender === "user"; // Adjust this based on your message structure
-  
+
     return (
       <View
         key={message.id}
@@ -313,6 +382,20 @@ const OrderDetails = ({ route }) => {
       </View>
     </TouchableOpacity>
   );
+
+  // NEW: Render Collection Item
+  const renderCollectionItem = ({ item }) => (
+    <View style={styles.collectionItem}>
+      <Text style={styles.collectionText}>ID: {item.id}</Text>
+      <Text style={styles.collectionText}>Amount: {formatCurrency(item.amount, item.currencyId)}</Text>
+      <Text style={[styles.collectionStatus, { color: getStatusColor(item.status) }]}>
+        Status: {item.status || "N/A"}
+      </Text>
+      <Text style={styles.collectionText}>Created: {formatDate(item.createdAt)}</Text>
+      {/* Add more collection details as needed */}
+    </View>
+  );
+
 
   // Render different sections based on type
   const renderSection = ({ item }) => {
@@ -572,6 +655,70 @@ const OrderDetails = ({ route }) => {
           </View>
         );
 
+      case "collections": // NEW: Collections Section
+        return (
+          <View style={styles.card}>
+            <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}>
+              Collections for this Order's User
+            </Text>
+
+            {loading ? (
+              <Text style={{ textAlign: "center", color: COLORS.gray }}>
+                Loading collections...
+              </Text>
+            ) : collections.length > 0 ? (
+              <FlatList
+                data={collections}
+                renderItem={renderCollectionItem}
+                keyExtractor={(item) => item.id.toString()}
+                style={styles.collectionsList}
+              />
+            ) : (
+              <Text style={{ textAlign: "center", color: COLORS.gray }}>
+                No collections found for this user.
+              </Text>
+            )}
+
+            <View style={styles.createCollectionSection}>
+              <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 5 }}>
+                Create New Collection
+              </Text>
+              <Text style={{ marginBottom: 5 }}>
+                Amount: {formatCurrency(order?.amount, order?.fromCurrency)}
+              </Text>
+
+              <Picker
+                selectedValue={selectedCollectionCurrency}
+                style={styles.picker}
+                onValueChange={(itemValue) => setSelectedCollectionCurrency(itemValue)}
+              >
+                <Picker.Item label="Select Currency" value={null} />
+                {currencies.map((currency) => (
+                  <Picker.Item
+                    key={currency.id}
+                    label={formatCurrencyDisplay(currency.id)}
+                    value={currency.id}
+                  />
+                ))}
+              </Picker>
+
+              <TouchableOpacity
+                style={[
+                  styles.assignButton,
+                  { opacity: selectedCollectionCurrency && !creatingCollection ? 1 : 0.5 },
+                  { marginTop: 10 }
+                ]}
+                onPress={handleCreateNewCollection}
+                disabled={!selectedCollectionCurrency || creatingCollection}
+              >
+                <Text style={styles.assignButtonText}>
+                  {creatingCollection ? "Creating..." : "Create Collection"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+
       case "info":
         return (
           <View style={styles.card}>
@@ -616,6 +763,7 @@ const OrderDetails = ({ route }) => {
         { type: "messages" },
         { type: "status" },
         { type: "members" },
+        { type: "collections" }, // NEW: Add collections section
         { type: "info" },
       ]}
       renderItem={renderSection}
@@ -782,6 +930,45 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     marginLeft: 10,
+  },
+  // NEW STYLES FOR COLLECTIONS
+  collectionsList: {
+    maxHeight: 200,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#e1e1e1',
+    borderRadius: 5,
+  },
+  collectionItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  collectionText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 2,
+  },
+  collectionStatus: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    textTransform: 'capitalize',
+  },
+  createCollectionSection: {
+    marginTop: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#e1e1e1',
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 5,
+    marginBottom: 10,
   },
 });
 

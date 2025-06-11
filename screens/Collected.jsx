@@ -1,312 +1,406 @@
-import { Pressable, View, Text, StyleSheet, TextInput, Platform } from "react-native"
-import gstyles from "../styles"
-import AntDesign from '@expo/vector-icons/AntDesign';
+import React, { useState, useEffect, useContext } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  Picker,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { AntDesign } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "../theme";
 import BtnPrimary from "../components/BtnPrimary";
+import { AuthContext } from "../context/AuthContext";
+import gstyles from "../styles";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import { generateAxiosInstance } from "../shared/constants";
-import { useEffect, useState } from "react";
-import { Picker } from "@react-native-picker/picker";
 
-const Collected = () => {
+const Collections = () => {
   const navigation = useNavigation();
+  const { user } = useContext(AuthContext);
+  const [collections, setCollections] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [creatingCollection, setCreatingCollection] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState(null);
+  const [currencies, setCurrencies] = useState([]);
+  // NEW STATES FOR MEMBER SELECTION
+  const [members, setMembers] = useState([]);
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
 
-  const [users, setUsers] = useState([]);
-
-  const fetchUsers = async () => {
+  // Helper function to fetch currencies, reused from OrderDetails.jsx logic
+  const fetchCurrencies = async () => {
     try {
       const axiosInstance = await generateAxiosInstance(true);
-      let res = await axiosInstance.get("/users/members");
-      
-      if (res.data.status) {
-        console.log("users", res.data.payload);
-        setUsers(res.data.payload);
+      const response = await axiosInstance.get("/currency/all");
+      const data = response.data;
+
+      if (data.status && data.payload) {
+        setCurrencies(data.payload);
+      } else {
+        console.error("Failed to fetch currencies");
       }
     } catch (error) {
-      console.log(error);
+      console.error("Error fetching currencies:", error);
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, [])
+  // NEW: Helper function to fetch members, reused from OrderDetails.jsx
+  const fetchMembers = async () => {
+    try {
+      setLoading(true); // Can share this loading state with initial collections fetch if desired
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.get("/users/members");
+      const data = response.data;
 
-  const [collections, setCollections] = useState([]);
+      if (data.status && data.payload) {
+        setMembers(data.payload);
+      } else {
+        Alert.alert("Error", "Failed to fetch members");
+      }
+    } catch (error) {
+      console.error("Error fetching members:", error);
+      Alert.alert("Error", "Failed to fetch members");
+    } finally {
+      // setLoading(false); // Do not set false here if sharing with collections fetch
+    }
+  };
 
+  const getCurrencyInfo = (currencyId) => {
+    if (!currencyId) return { name: "N/A", symbol: "", code: "" };
+    const currency = currencies.find(
+      (curr) => curr.id && curr.id.toString() === currencyId.toString()
+    );
+    return currency ? currency : { name: "N/A", symbol: "", code: "" };
+  };
+
+  const formatCurrencyDisplay = (currencyId) => {
+    const currency = getCurrencyInfo(currencyId);
+    if (currency.symbol) {
+      return `${currency.name} (${currency.symbol})`;
+    } else if (currency.code) {
+      return `${currency.name} (${currency.code})`;
+    }
+    return currency.name;
+  };
+
+  const formatCurrency = (amountValue, currencyId) => {
+    if (!amountValue) return "0";
+    const currency = getCurrencyInfo(currencyId);
+    const formattedAmount = parseFloat(amountValue).toLocaleString();
+    return `${formattedAmount} ${currency.symbol || currency.code || currency.name}`;
+  };
+
+  // Function to fetch collections for the current user
   const fetchCollections = async () => {
     try {
+      setLoading(true);
       const axiosInstance = await generateAxiosInstance(true);
-      let res = await axiosInstance.get("/collections");
-      
+      // Assuming user.id is available from AuthContext for memberId
+      let res = await axiosInstance.get(`/collections/member/${user?.id}`);
       if (res.data.status) {
-        console.log("collections", res.data.payload);
         setCollections(res.data.payload);
       }
     } catch (error) {
-      console.log(error);
+      console.error("Error fetching collections:", error);
+      Alert.alert("Error", "Failed to fetch collections.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const [amount, setAmount] = useState(null);
-  const [useId, setUserId] = useState(null);
-  const [posting, setPosting] = useState(false);
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
 
-  const postCollections = async () => {
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "confirmed":
+        return "green";
+      case "rejected":
+        return "red";
+      case "pending":
+      default:
+        return "orange";
+    }
+  };
+
+  // Function to handle creating a new collection
+  const handleCreateCollection = async () => {
+    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      Alert.alert("Error", "Please enter a valid amount.");
+      return;
+    }
+    if (!selectedCurrencyId) {
+      Alert.alert("Error", "Please select a currency.");
+      return;
+    }
+    // VALIDATION FOR SELECTED MEMBER ID
+    if (!selectedMemberId) {
+      Alert.alert("Error", "Please select a member to assign the collection to.");
+      return;
+    }
+
     try {
-      setPosting(true);
+      setCreatingCollection(true);
       const axiosInstance = await generateAxiosInstance(true);
-      let data = {
-        amount: amount,
-        userId: useId
-      };
-      let res = await axiosInstance.post("/collections", data);
-      
-      if (res.data.status) {
-        setPosting(false);
-        setAmount(null);
-        setUserId(null);
-        fetchCollections();
-        fetchUsers();
+      const response = await axiosInstance.post("/collections", {
+        amount: parseFloat(amount),
+        userId: selectedMemberId, // *** NOW USING selectedMemberId ***
+        currencyId: selectedCurrencyId,
+      });
+
+      const data = response.data;
+      if (data.status) {
+        Alert.alert("Success", "Collection created successfully!");
+        setAmount(""); // Clear input field
+        setSelectedCurrencyId(null); // Reset currency picker
+        setSelectedMemberId(null); // Reset member picker
+        fetchCollections(); // Refresh the list of collections
+      } else {
+        Alert.alert("Error", data.payload || "Failed to create collection.");
       }
     } catch (error) {
-      console.log(error);
-      setPosting(false);
+      console.error("Error creating collection:", error);
+      Alert.alert("Error", "Failed to create collection.");
+    } finally {
+      setCreatingCollection(false);
     }
   };
 
   useEffect(() => {
     fetchCollections();
-  }, [])
+    fetchCurrencies();
+    fetchMembers(); // NEW: Fetch members on component mount
+  }, []);
 
-  // Get selected user name for display
-  const getSelectedUserName = () => {
-    if (!useId) return "Select User";
-    const selectedUser = users.find(user => user.id === useId);
-    return selectedUser ? selectedUser.full_name : "Select User";
+  const renderCollectionItem = ({ item }) => {
+    return (
+      <View key={item.id} style={styles.card}>
+        <View style={styles.collectionRow}>
+          <Text style={styles.collectionId}>#{item?.id}</Text>
+          <Text style={styles.collectionDate}>{formatDate(item?.createdAt || item?.created_at)}</Text>
+        </View>
+        <View style={styles.collectionRow}>
+          <Text style={styles.collectionAmount}>
+            Amount: {formatCurrency(item?.amount, item?.currencyId)}
+          </Text>
+          <Text style={[styles.collectionStatus, { color: getStatusColor(item?.status) }]}>
+            Status: {item?.status || "N/A"}
+          </Text>
+        </View>
+      </View>
+    );
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+    <ScrollView style={styles.container}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <View>
-          <Pressable onPress={() => navigation.navigate("Home")} style={styles.backButton}>
+          <Pressable onPress={() => navigation.navigate("Home")} style={{ padding: 5 }}>
             <AntDesign name="arrowleft" size={32} color="black" />
           </Pressable>
         </View>
-        <View style={styles.titleContainer}>
-          <Text style={gstyles.gtitle}>Collected</Text>
-        </View>
-        <View style={styles.spacer}></View>
-      </View>
-
-      {/* Input Form */}
-      <View style={styles.formContainer}>
-        <View style={styles.inputRow}>
-          <View style={styles.amountContainer}>
-            <Text style={styles.label}>Amount</Text>
-            <TextInput
-              placeholder="Enter Amount"
-              style={gstyles.input}
-              keyboardType="numeric"
-              value={amount}
-              onChangeText={(text) => setAmount(text)}
-            />
-          </View>
-
-          <View style={styles.pickerContainer}>
-            <Text style={styles.label}>Select User</Text>
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={useId}
-                onValueChange={(itemValue) => setUserId(itemValue)}
-                style={styles.picker}
-                mode="dropdown" // This helps on Android
-                dropdownIconColor={COLORS.primary} // Makes dropdown arrow visible
-                itemStyle={styles.pickerItem} // For iOS styling
-              >
-                <Picker.Item 
-                  label="Select User" 
-                  value={null} 
-                  color={Platform.OS === 'android' ? '#999' : undefined}
-                />
-                {users.map((user) => (
-                  <Picker.Item 
-                    key={user.id} 
-                    label={user.full_name} 
-                    value={user.id}
-                    color={Platform.OS === 'android' ? '#333' : undefined}
-                  />
-                ))}
-              </Picker>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.buttonContainer}>
-          <BtnPrimary loading={posting} onPress={postCollections} title="Save" />
+        <View>
+          <Text style={gstyles.gtitle}>Collections</Text>
         </View>
       </View>
 
-      {/* Table */}
-      <View style={styles.tableContainer}>
-        {/* Table Header */}
-        <View style={[styles.tableRow, styles.tableHeaderRow]}>
-          <View style={styles.dateColumn}>
-            <Text style={styles.tableHeader}>Date</Text>
-          </View>
-          <View style={styles.memberColumn}>
-            <Text style={styles.tableHeader}>Member</Text>
-          </View>
-          <View style={styles.amountColumn}>
-            <Text style={styles.tableHeader}>Amount</Text>
-          </View>
+      {/* Section to create a new collection */}
+      <View style={styles.createCollectionSection}>
+        <Text style={styles.sectionTitle}>Create New Collection</Text>
+        <TextInput
+          style={gstyles.input}
+          placeholder="Enter Amount"
+          keyboardType="numeric"
+          value={amount}
+          onChangeText={setAmount}
+        />
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={selectedCurrencyId}
+            style={styles.picker}
+            onValueChange={(itemValue) => setSelectedCurrencyId(itemValue)}
+          >
+            <Picker.Item label="Select Currency" value={null} />
+            {currencies.map((currency) => (
+              <Picker.Item
+                key={currency.id}
+                label={formatCurrencyDisplay(currency.id)}
+                value={currency.id}
+              />
+            ))}
+          </Picker>
+        </View>
+        {/* NEW: Member Selection Picker */}
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={selectedMemberId}
+            style={styles.picker}
+            onValueChange={(itemValue) => setSelectedMemberId(itemValue)}
+          >
+            <Picker.Item label="Assign to Member" value={null} />
+            {members.map((member) => (
+              <Picker.Item
+                key={member.id}
+                label={member.full_name || member.email || `Member ID: ${member.id}`}
+                value={member.id}
+              />
+            ))}
+          </Picker>
         </View>
 
-        {/* Table Body */}
-        {collections.map((col, index) => {
-          // Find user name from users array
-          const user = users.find(u => u.id === col.userId);
-          const userName = user ? user.full_name : `User ${col.userId}`;
-          
-          return (
-            <View key={index} style={[styles.tableRow, styles.tableBodyRow]}>
-              <View style={styles.dateColumn}>
-                <Text style={styles.tablebody}>
-                  {col.created_at ? col.created_at.slice(0, 10) : ''}
-                </Text>
-              </View>
-              <View style={styles.memberColumn}>
-                <Text style={styles.tablebody}>{userName}</Text>
-              </View>
-              <View style={styles.amountColumn}>
-                <Text style={styles.tablebody}>{col.amount.toLocaleString()}</Text>
-              </View>
-            </View>
-          )
-        })}
+        <TouchableOpacity
+          style={[
+            styles.createButton,
+            { opacity: amount && selectedCurrencyId && selectedMemberId && !creatingCollection ? 1 : 0.5 },
+          ]}
+          onPress={handleCreateCollection}
+          disabled={!amount || !selectedCurrencyId || !selectedMemberId || creatingCollection}
+        >
+          <Text style={styles.createButtonText}>
+            {creatingCollection ? "Creating..." : "Create Collection"}
+          </Text>
+        </TouchableOpacity>
       </View>
-    </View>
-  )
-}
 
-export default Collected
+      <Text style={styles.sectionTitle}>Your Collections</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading collections...</Text>
+        </View>
+      ) : collections.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="inbox" size={48} color={COLORS.gray} />
+          <Text style={styles.emptyText}>No collections found</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={collections}
+          renderItem={renderCollectionItem}
+          keyExtractor={(item) => item.id.toString()}
+          scrollEnabled={false}
+        />
+      )}
+    </ScrollView>
+  );
+};
+
+export default Collections;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 20,
-    backgroundColor: '#fff'
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    padding: 5
-  },
-  titleContainer: {
+    backgroundColor: COLORS.primary2,
     flex: 1,
-    alignItems: 'center'
   },
-  spacer: {
-    width: 42,
+  card: {
+    marginVertical: 8,
+    borderRadius: 10,
+    padding: 15,
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+    elevation: 3,
   },
-  formContainer: {
-    marginBottom: 20,
+  collectionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 5,
   },
-  inputRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 15,
+  collectionId: {
+    fontWeight: "bold",
+    fontSize: 16,
+    color: "#333",
   },
-  amountContainer: {
+  collectionDate: {
+    fontSize: 14,
+    color: COLORS.gray,
+  },
+  collectionAmount: {
+    fontWeight: "bold",
+    fontSize: 15,
+    color: COLORS.primary,
+  },
+  collectionStatus: {
+    fontSize: 14,
+    fontWeight: "bold",
+    textTransform: "capitalize",
+  },
+  loadingContainer: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 50,
+  },
+  loadingText: {
+    marginTop: 10,
+    color: COLORS.gray,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 50,
+  },
+  emptyText: {
+    marginTop: 10,
+    color: COLORS.gray,
+    fontSize: 16,
+  },
+  createCollectionSection: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 15,
+    marginTop: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+    elevation: 3,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333",
   },
   pickerContainer: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 5,
-    color: COLORS.primary
-  },
-  pickerWrapper: {
+    borderColor: "gray",
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 5,
-    backgroundColor: '#fff',
-    // Enhanced styling for better visibility
-    minHeight: 50,
-    justifyContent: 'center',
-    ...Platform.select({
-      android: {
-        paddingHorizontal: 0, // Remove padding on Android
-      },
-      ios: {
-        paddingHorizontal: 10,
-      }
-    })
+    marginBottom: 10,
+    overflow: "hidden",
   },
   picker: {
     height: 50,
-    width: '100%',
-    // Platform-specific styling
-    ...Platform.select({
-      android: {
-        color: '#333',
-        backgroundColor: 'transparent',
-      },
-      ios: {
-        color: '#333',
-      }
-    })
+    width: "100%",
   },
-  pickerItem: {
-    // iOS specific item styling
-    fontSize: 16,
-    color: '#333'
-  },
-  buttonContainer: {
-    width: 120,
-    alignSelf: 'flex-end'
-  },
-  tableContainer: {
-    flex: 1,
-  },
-  tableRow: {
-    flexDirection: 'row',
-  },
-  tableHeaderRow: {
-    backgroundColor: COLORS.primary3,
+  createButton: {
+    backgroundColor: COLORS.primary,
     paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
   },
-  tableBodyRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e1e1',
-    paddingVertical: 10,
+  createButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
-  dateColumn: {
-    width: '30%',
-    paddingHorizontal: 8,
-  },
-  memberColumn: {
-    width: '40%',
-    paddingHorizontal: 8,
-  },
-  amountColumn: {
-    width: '30%',
-    paddingHorizontal: 8,
-  },
-  tableHeader: {
-    color: COLORS.primary,
-    fontWeight: 'bold',
-    fontSize: 14
-  },
-  tablebody: {
-    fontSize: 13,
-    color: '#333'
-  }
-})
+});
