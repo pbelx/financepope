@@ -11,12 +11,13 @@ import {
   ActivityIndicator,
   Modal,
 } from "react-native";
-import { useRoute, useFocusEffect } from "@react-navigation/native";
+import { useRoute, useFocusEffect, useNavigation } from "@react-navigation/native";
 import { AuthContext } from "../context/AuthContext";
 import { generateAxiosInstance } from "../shared/constants";
 
 const FloatScreen = () => {
   const route = useRoute();
+  const navigation = useNavigation();
   const { userId } = route.params;
   const { token, user } = useContext(AuthContext);
   
@@ -85,9 +86,11 @@ const FloatScreen = () => {
       const data = response.data;
       
       if (data.status) {
+        // Remove the accepted float from the list immediately
+        setPendingCollections(prev => prev.filter(item => item.id !== collectionId));
+        
         Alert.alert('Success', 'Float accepted successfully!', [
           { text: 'OK', onPress: () => {
-            fetchPendingCollections(); // Refresh the list
             fetchBalance(); // Update balance
           }}
         ]);
@@ -97,50 +100,108 @@ const FloatScreen = () => {
     } catch (error) {
       console.error('Error accepting float:', error);
       Alert.alert('Error', error.message || 'Failed to accept float');
+      // Refresh the list in case of error to ensure consistency
+      fetchPendingCollections();
     } finally {
       setProcessingId(null);
     }
   };
 
   // Reject collection
-  const handleRejectFloat = async (collectionId) => {
-    Alert.alert(
-      'Confirm Rejection',
-      'Are you sure you want to reject this float?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            setProcessingId(collectionId);
+  // const handleRejectFloat = async (collectionId) => {
+  //   Alert.alert(
+  //     'Confirm Rejection',
+  //     'Are you sure you want to reject this float?',
+  //     [
+  //       { text: 'Cancel', style: 'cancel' },
+  //       {
+  //         text: 'Reject',
+  //         style: 'destructive',
+  //         onPress: async () => {
+  //           setProcessingId(collectionId);
             
-            try {
-              const axiosInstance = await generateAxiosInstance(true);
-              const response = await axiosInstance.put(`/collections/${collectionId}/reject`, {
-                userId
-              });
+  //           try {
+  //             const axiosInstance = await generateAxiosInstance(true);
+  //             const response = await axiosInstance.put(`/collections/${collectionId}/reject`, {
+  //               userId
+  //             });
 
-              const data = response.data;
+  //             const data = response.data;
               
-              if (data.status) {
-                Alert.alert('Success', 'Float rejected successfully!', [
-                  { text: 'OK', onPress: () => fetchPendingCollections() }
-                ]);
-              } else {
-                throw new Error('Failed to reject float');
-              }
-            } catch (error) {
-              console.error('Error rejecting float:', error);
-              Alert.alert('Error', error.message || 'Failed to reject float');
-            } finally {
-              setProcessingId(null);
-            }
-          },
-        },
-      ]
-    );
+  //             if (data.status) {
+  //               // Remove the rejected float from the list immediately
+  //               setPendingCollections(prev => prev.filter(item => item.id !== collectionId));
+                
+  //               Alert.alert('Success', 'Float rejected successfully!');
+  //             } else {
+  //               throw new Error('Failed to reject float');
+  //             }
+  //           } catch (error) {
+  //             console.error('Error rejecting float:', error);
+  //             Alert.alert('Error', error.message || 'Failed to reject float');
+  //             // Refresh the list in case of error to ensure consistency
+  //             fetchPendingCollections();
+  //           } finally {
+  //             setProcessingId(null);
+  //           }
+  //         },
+  //       },
+  //     ]
+  //   );
+  // };
+  const handleRejectFloat = async (collectionId) => {
+    setProcessingId(collectionId);
+  
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.put(`/collections/${collectionId}/reject`, {
+        userId,
+      });
+  
+      const data = response.data;
+  
+      if (data.status) {
+        setPendingCollections(prev => prev.filter(item => item.id !== collectionId));
+        Alert.alert('Success', 'Float rejected successfully!');
+      } else {
+        throw new Error('Failed to reject float');
+      }
+    } catch (error) {
+      console.error('Error rejecting float:', error);
+      Alert.alert('Error', error.message || 'Failed to reject float');
+      fetchPendingCollections(); // Refresh the list in case of error
+    } finally {
+      setProcessingId(null);
+    }
   };
+  
+
+  const confirmRejectFloat = async (collectionId) => {
+    setProcessingId(collectionId);
+  
+    try {
+      const axiosInstance = await generateAxiosInstance(true);
+      const response = await axiosInstance.put(`/collections/${collectionId}/reject`, {
+        userId,
+      });
+  
+      const data = response.data;
+  
+      if (data.status) {
+        setPendingCollections(prev => prev.filter(item => item.id !== collectionId));
+        Alert.alert('Success', 'Float rejected successfully!');
+      } else {
+        throw new Error('Failed to reject float');
+      }
+    } catch (error) {
+      console.error('Error rejecting float:', error);
+      Alert.alert('Error', error.message || 'Failed to reject float');
+      fetchPendingCollections(); // Optional, to resync
+    } finally {
+      setProcessingId(null);
+    }
+  };
+  
 
   // Refresh handler
   const onRefresh = () => {
@@ -164,7 +225,7 @@ const FloatScreen = () => {
     if (!currency) return `${amount.toFixed(2)}`;
     
     // Handle different currency symbols properly
-    const symbol = currency.symbol || currency.code || '';
+    const symbol = currency.symbol || currency.code || '$';
     return `${symbol} ${amount.toLocaleString(undefined, { 
       minimumFractionDigits: 2, 
       maximumFractionDigits: 2 
@@ -176,8 +237,7 @@ const FloatScreen = () => {
     <View style={styles.floatItem}>
       <View style={styles.floatHeader}>
         <View style={styles.amountContainer}>
-          <Text style={styles.currencySymbol}>{item.currency?.symbol || item.currency?.code || ''
-              }</Text>
+          <Text style={styles.currencySymbol}>{item.currency?.symbol || item.currency?.code || '$'}</Text>
           <Text style={styles.amount}>{item.amount.toLocaleString(undefined, { 
             minimumFractionDigits: 2, 
             maximumFractionDigits: 2 
@@ -264,7 +324,15 @@ const FloatScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Float Management</Text>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Float</Text>
+        </View>
         <TouchableOpacity
           style={styles.balanceButton}
           onPress={() => setShowBalanceModal(true)}
@@ -325,6 +393,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  backButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 15,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
   },
   title: {
     fontSize: 24,
@@ -494,7 +577,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 5,  
     minWidth: 250,
   },
   modalTitle: {
