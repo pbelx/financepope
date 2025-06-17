@@ -49,12 +49,14 @@ const ChatScreen = () => {
     // If chatType is 'admin_select' or no targetUserId is provided for a direct chat,
     // explicitly show the admin selector and fetch admins.
     if (chatType === 'admin_select' || (!targetUserId && !isOrderChat)) {
+      console.log('Initial useEffect: admin_select mode or no targetUserId for direct chat.');
       console.log('Showing admin selector, fetching admins...');
       setShowAdminSelector(true);
       fetchAdmins();
     } else if (targetUserId) {
       // If targetUserId is provided, set it as the initially selected admin
      // console.log('Setting selected admin from targetUserId:', targetUserId);
+      console.log('Initial useEffect: targetUserId present. Setting selectedAdmin with id:', targetUserId, 'name:', targetUserName);
       setSelectedAdmin({ id: targetUserId, full_name: targetUserName });
       setShowAdminSelector(false);
       // Fetch messages immediately for this initial target
@@ -66,6 +68,7 @@ const ChatScreen = () => {
   // This useEffect replaces the previous one that depended on currentTargetUserId directly,
   // ensuring it reacts to selection changes.
   useEffect(() => {
+    console.log('selectedAdmin useEffect: selectedAdmin:', JSON.stringify(selectedAdmin, null, 2), 'showAdminSelector:', showAdminSelector, 'orderId:', orderId, 'isOrderChat:', isOrderChat);
     if (selectedAdmin?.id && !showAdminSelector) { // Only fetch if an admin is selected AND selector is not shown
       //console.log('Selected admin changed or screen focused, fetching messages for:', selectedAdmin.id);
       fetchChatMessages(selectedAdmin.id); 
@@ -82,6 +85,7 @@ const ChatScreen = () => {
   // Refresh on screen focus - ensure it uses the *currently selected* admin
   useFocusEffect(
     useCallback(() => {
+      console.log('useFocusEffect: selectedAdmin:', JSON.stringify(selectedAdmin, null, 2), 'showAdminSelector:', showAdminSelector);
       // Only refresh if an admin is selected and we're not in the selector view
       if (selectedAdmin?.id && !showAdminSelector) {
       //  console.log('Screen focused, refreshing messages for:', selectedAdmin.id);
@@ -145,6 +149,7 @@ const ChatScreen = () => {
   };
 
   const fetchChatMessages = async (explicitTargetUserId) => {
+    console.log('fetchChatMessages called with explicitTargetUserId:', explicitTargetUserId, 'orderId:', orderId, 'isOrderChat:', isOrderChat, 'selectedAdmin:', JSON.stringify(selectedAdmin, null, 2));
     // Always use the explicitTargetUserId passed to this function.
     // This makes the function more predictable and decouples it from direct state changes.
     const targetId = explicitTargetUserId;
@@ -176,6 +181,8 @@ const ChatScreen = () => {
         res = await axiosInstance.get(`/messages/chat/${orderId}`);
         
         if (res.data.status && res.data.payload) {
+          console.log('Raw API Response Payload:', JSON.stringify(res.data.payload, null, 2));
+          console.log('Current user ID:', user.id);
       //    console.log('Raw order messages before filtering:', res.data.payload.length);
           // For order chats, filter messages between current user and selected admin
           filteredMessages = res.data.payload.filter(message => {
@@ -209,6 +216,8 @@ const ChatScreen = () => {
         res = await axiosInstance.get(`/messages/chat/user/${targetId}`);
         
         if (res.data.status && res.data.payload) {
+          console.log('Raw API Response Payload:', JSON.stringify(res.data.payload, null, 2));
+          console.log('Current user ID:', user.id);
           console.log('Raw direct messages from backend (assuming pre-filtered):', res.data.payload.length);
           // Keeping this client-side filter as a robustness check, though backend should handle it.
           filteredMessages = res.data.payload.filter(message => {
@@ -359,9 +368,19 @@ const ChatScreen = () => {
   };
 
   const renderMessage = ({ item }) => {
-    if (!item.sender) {
-      console.log('Message missing sender:', item);
-      return null;
+    if (!item.sender || !item.sender.id) {
+      if (item.sender_id) {
+        // Attempt to reconstruct sender from sender_id
+        // console.log('Attempting to reconstruct sender for message ID:', item.id, 'using sender_id:', item.sender_id);
+        item.sender = {
+          id: item.sender_id,
+          // Try to find a name, default to "User [ID]"
+          full_name: item.sender_name || item.sender_username || `User ${item.sender_id.toString().substring(0, 6)}`
+        };
+      } else {
+        console.log('Message missing critical sender information (sender object or sender.id, and no sender_id fallback):', JSON.stringify(item, null, 2));
+        return null; // Skip rendering this message
+      }
     }
     
     const isMyMessage = item.sender.id === user.id;
