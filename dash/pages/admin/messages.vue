@@ -68,11 +68,16 @@
               <span v-else>Chat with {{ selectedConversation.user.name }}</span> <!-- Fallback if somehow order is null but not direct -->
             </v-card-title>
             <v-divider></v-divider>
-            <v-card-text class="flex-grow-1 overflow-y-auto pa-3 chat-history-vuetify">
+            <v-card-text class="flex-grow-1 overflow-y-auto pa-3 chat-history-vuetify d-flex flex-column">
               <div v-if="loadingChatHistory" class="d-flex justify-center align-center fill-height">
                 <v-progress-circular indeterminate color="primary"></v-progress-circular>
               </div>
-              <div v-else>
+              <div v-else-if="!loadingChatHistory && selectedConversation && chatHistory.length === 0" class="d-flex justify-center align-center fill-height">
+                <v-alert type="info" class="ma-3">
+                  No messages found in this conversation.
+                </v-alert>
+              </div>
+              <div v-else-if="chatHistory.length > 0">
                 <div
                   v-for="message in chatHistory"
                   :key="message.id"
@@ -263,7 +268,7 @@ export default {
       this.conversations = processedConversations;
     },
     async selectConversation(conversation) { // Make method async
-      console.log('Selected conversation:', conversation);
+      console.log('[AdminMessagesPage] selectConversation: Received conversation object:', JSON.parse(JSON.stringify(conversation))); // Log the full conversation object
       this.selectedConversation = conversation;
       this.chatHistory = [];
       this.loadingChatHistory = true;
@@ -271,68 +276,65 @@ export default {
       try {
         if (conversation.isDirectChat) {
           if (!conversation.user || !conversation.user.id) {
-            console.error('Cannot fetch direct chat: Member ID is missing.', conversation);
+            console.error('[AdminMessagesPage] selectConversation: Cannot fetch direct chat - Member ID is missing.', JSON.parse(JSON.stringify(conversation)));
             alert('Cannot load direct chat: User details are incomplete.');
-            this.chatHistory = []; // Ensure chat history is clear
-            // this.loadingChatHistory = false; // Will be handled by finally
-            return; // Exit early
+            this.chatHistory = [];
+            return;
           }
-          console.log(`Fetching full history for direct chat with user ${conversation.user.id}`);
-          const response = await this.$api.get(`/messages/direct/${conversation.user.id}`);
+          const userIdForDirectChat = conversation.user.id;
+          console.log(`[AdminMessagesPage] selectConversation: Fetching direct chat history for user ID: ${userIdForDirectChat}`);
+          const response = await this.$api.get(`/messages/user/${userIdForDirectChat}`);
+          console.log('[AdminMessagesPage] selectConversation: Raw API response for direct chat:', JSON.parse(JSON.stringify(response))); // Log raw response
           if (response.data && response.data.status) {
-            this.chatHistory = response.data.payload || []; // Payload is expected to be sorted array of messages
+            this.chatHistory = response.data.payload || [];
+            console.log('[AdminMessagesPage] selectConversation: Assigned chatHistory for direct chat (from payload):', JSON.parse(JSON.stringify(this.chatHistory)));
           } else {
-            console.error('Failed to fetch direct chat history: API returned unsuccessful status', response.data);
+            console.error('[AdminMessagesPage] selectConversation: Failed to fetch direct chat history - API returned unsuccessful status.', JSON.parse(JSON.stringify(response.data)));
             alert('Failed to load direct chat history. ' + (response.data?.payload || 'Unknown API error.'));
             this.chatHistory = [];
           }
         } else if (conversation.order && conversation.order.id) {
-          // For order chats, call the existing fetchChatHistory method.
-          // fetchChatHistory is already async and handles its own loading flags and errors.
-          await this.fetchChatHistory(conversation.order.id);
-          // loadingChatHistory will be managed by fetchChatHistory's finally block
+          const orderIdForChat = conversation.order.id;
+          console.log(`[AdminMessagesPage] selectConversation: Calling fetchChatHistory for order ID: ${orderIdForChat}`);
+          await this.fetchChatHistory(orderIdForChat);
         } else {
-          console.warn('Selected conversation is neither a valid direct chat nor an order chat:', conversation);
+          console.warn('[AdminMessagesPage] selectConversation: Selected conversation is neither a valid direct chat nor an order chat:', JSON.parse(JSON.stringify(conversation)));
           alert('Cannot load conversation: Invalid conversation data.');
           this.chatHistory = [];
         }
       } catch (error) {
-        console.error('Error in selectConversation:', error);
+        console.error('[AdminMessagesPage] selectConversation: Error during chat history fetch:', error);
         if (error.response) {
-          console.error('Error response data:', error.response.data);
+          console.error('[AdminMessagesPage] selectConversation: Error response data:', JSON.parse(JSON.stringify(error.response.data)));
           alert(`Failed to load conversation: ${error.response.data?.payload || error.message}`);
         } else {
           alert('Failed to load conversation: ' + error.message);
         }
-        this.chatHistory = []; // Ensure chat history is clear on error
+        this.chatHistory = [];
       } finally {
-        // If fetchChatHistory was called, it handles its own loading flag.
-        // If it was a direct chat, or an invalid selection that didn't call fetchChatHistory,
-        // or if fetchChatHistory was called but we want a final say:
         if (conversation.isDirectChat || (!conversation.order || !conversation.order.id)) {
              this.loadingChatHistory = false;
         }
-        // If fetchChatHistory was awaited, its finally would have run.
-        // This ensures it's false if the direct chat path or error path was taken before calling fetchChatHistory.
       }
     },
     async fetchChatHistory(orderId) {
+      console.log(`[AdminMessagesPage] fetchChatHistory: Fetching chat history for order ID: ${orderId}`);
       this.loadingChatHistory = true;
       try {
         const response = await this.$api.get(`/messages/chat/${orderId}`);
+        console.log(`[AdminMessagesPage] fetchChatHistory: Raw API response for order chat (order ID ${orderId}):`, JSON.parse(JSON.stringify(response))); // Log raw response
         if (response.data && response.data.status) {
-          // Messages should be sorted by created_at ascending (chat order)
           this.chatHistory = (response.data.payload || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-          // this.markMessagesAsRead(orderId); // Removed call
+          console.log(`[AdminMessagesPage] fetchChatHistory: Assigned chatHistory for order ID ${orderId} (from payload):`, JSON.parse(JSON.stringify(this.chatHistory)));
         } else {
-          console.error(`Failed to fetch chat history for order ${orderId}: API returned unsuccessful status`, response.data);
+          console.error(`[AdminMessagesPage] fetchChatHistory: Failed to fetch chat history for order ${orderId} - API returned unsuccessful status.`, JSON.parse(JSON.stringify(response.data)));
           alert(`Failed to load chat history. ${response.data?.payload || 'Unknown API error.'}`);
           this.chatHistory = [];
         }
       } catch (error) {
-        console.error(`Error fetching chat history for order ${orderId}:`, error);
+        console.error(`[AdminMessagesPage] fetchChatHistory: Error fetching chat history for order ${orderId}:`, error);
         if (error.response) {
-          console.error('Error response data:', error.response.data);
+          console.error(`[AdminMessagesPage] fetchChatHistory: Error response data (order ID ${orderId}):`, JSON.parse(JSON.stringify(error.response.data)));
           alert(`Failed to fetch chat history: ${error.response.data?.payload || error.message}`);
         } else {
           alert('Failed to fetch chat history: ' + error.message);
