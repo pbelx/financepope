@@ -44,23 +44,29 @@ const ChatScreen = () => {
 
   // Initialize based on chat type and route params
   useEffect(() => {
-    //console.log('ChatScreen initialized with params:', { chatType, targetUserId, isOrderChat });
-    
+    // For logging initial parameters for order chats
+    if (isOrderChat && orderId) {
+      console.log('[ChatScreen] Initializing for ORDER CHAT. Route Params:',
+        JSON.parse(JSON.stringify({ orderId, targetUserId, targetUserName, isOrderChat, chatType }))
+      );
+    }
+
     // If chatType is 'admin_select' or no targetUserId is provided for a direct chat,
     // explicitly show the admin selector and fetch admins.
     if (chatType === 'admin_select' || (!targetUserId && !isOrderChat)) {
-      console.log('Showing admin selector, fetching admins...');
+      console.log('[ChatScreen] Showing admin selector, fetching admins...');
       setShowAdminSelector(true);
       fetchAdmins();
     } else if (targetUserId) {
       // If targetUserId is provided, set it as the initially selected admin
-     // console.log('Setting selected admin from targetUserId:', targetUserId);
-      setSelectedAdmin({ id: targetUserId, full_name: targetUserName });
+      const initialAdmin = { id: targetUserId, full_name: targetUserName || 'N/A' };
+      console.log('[ChatScreen] Setting selected admin from targetUserId:', JSON.parse(JSON.stringify(initialAdmin)));
+      setSelectedAdmin(initialAdmin);
       setShowAdminSelector(false);
       // Fetch messages immediately for this initial target
       fetchChatMessages(targetUserId); 
     }
-  }, [chatType, targetUserId, isOrderChat]); // Dependencies ensure this runs only when route params change initially
+  }, [chatType, targetUserId, orderId, isOrderChat, targetUserName]); // Added orderId, targetUserName to dependencies for completeness of logging and initial setup.
 
   // Fetch messages when selectedAdmin changes (or other relevant chat parameters)
   // This useEffect replaces the previous one that depended on currentTargetUserId directly,
@@ -205,8 +211,8 @@ const ChatScreen = () => {
         }
       } else {
         // Direct user chat - this should already be filtered by the backend
-        console.log('Fetching direct chat messages with user:', targetId);
-        res = await axiosInstance.get(`/messages/chat/user/${targetId}`);
+        console.log('Fetching direct chat messages with user (using /messages/user/):', targetId);
+        res = await axiosInstance.get(`/messages/user/${targetId}`);
         
         if (res.data.status && res.data.payload) {
           console.log('Raw direct messages from backend (assuming pre-filtered):', res.data.payload.length);
@@ -333,8 +339,9 @@ const ChatScreen = () => {
   };
 
   const selectAdmin = (admin) => {
-    console.log('Selecting admin:', admin);
-    console.log('Previous admin:', selectedAdmin);
+    console.log('[ChatScreen] Admin selected via selectAdmin function:', JSON.parse(JSON.stringify(admin)), '. Is this an order chat?', isOrderChat);
+    // console.log('Selecting admin:', admin); // Original log, can be kept or removed
+    // console.log('Previous admin:', selectedAdmin); // Original log, can be kept or removed
     
     // Clear messages immediately
     setMessages([]);
