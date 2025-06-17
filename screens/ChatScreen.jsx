@@ -182,32 +182,35 @@ const ChatScreen = () => {
         res = await axiosInstance.get(`/messages/chat/${orderId}`);
         
         if (res.data.status && res.data.payload) {
-      //    console.log('Raw order messages before filtering:', res.data.payload.length);
-          // For order chats, filter messages between current user and selected admin
+          console.log('[ChatScreen] Raw order messages before new filtering:', res.data.payload.length, 'for order ID:', orderId);
           filteredMessages = res.data.payload.filter(message => {
             const isFromCurrentUser = message.sender?.id === user.id;
-            const isToCurrentUser = message.recipient?.id === user.id;
-            const isFromSelectedAdmin = message.sender?.id === targetId; // Use targetId here
-            const isToSelectedAdmin = message.recipient?.id === targetId; // Use targetId here
             
-            // Include messages where:
-            // 1. Current user sent to selected admin (targetId)
-            // 2. Selected admin (targetId) sent to current user
-            const shouldInclude = (isFromCurrentUser && isToSelectedAdmin) || 
-                                 (isFromSelectedAdmin && isToCurrentUser);
+            // Check if the message is from an admin and directed to the current user.
+            // Assumes message.sender_type is reliably 'ADMIN' for admin messages.
+            // And message.recipient.id is correctly set for admin replies to the user.
+            const isFromAdminToCurrentUser = message.sender_type === 'ADMIN' && message.recipient?.id === user.id;
+
+            // Include the message if:
+            // 1. It's from the current user (they should see all their messages for this order context).
+            // 2. It's from an admin to the current user.
+            const shouldInclude = isFromCurrentUser || isFromAdminToCurrentUser;
             
-            // console.log('Message filter debug:', {
-            //   msgId: message.id,
-            //   sender: message.sender?.id,
-            //   recipient: message.recipient?.id,
-            //   user: user.id,
-            //   target: targetId,
-            //   shouldInclude
-            // });
+            if (!shouldInclude && message.sender_type === 'ADMIN') {
+                console.log('[ChatScreen] Admin message NOT included (recipient not current user):',
+                    JSON.parse(JSON.stringify({
+                        messageId: message.id,
+                        senderId: message.sender?.id,
+                        senderType: message.sender_type,
+                        recipientId: message.recipient?.id,
+                        currentUserId: user.id
+                    }))
+                );
+            }
 
             return shouldInclude;
           });
-          console.log('Filtered order messages:', filteredMessages.length);
+          console.log('[ChatScreen] Filtered order messages (new logic - any admin to user):', filteredMessages.length);
         }
       } else {
         // Direct user chat - this should already be filtered by the backend
