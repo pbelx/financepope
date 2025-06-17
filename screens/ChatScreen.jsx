@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl, // Import RefreshControl
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
@@ -27,14 +28,43 @@ const ChatScreen = () => {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [isPollingMessages, setIsPollingMessages] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false); // State for pull-to-refresh
   const flatListRef = useRef(null);
 
   useEffect(() => {
-    fetchChatMessages();
+    // Pass false for isPollRequest and isManualRefresh for initial load
+    fetchChatMessages(false, false);
+
+    const intervalId = setInterval(() => {
+      // Pass true for isPollRequest, false for isManualRefresh for polling
+      fetchChatMessages(true, false);
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(intervalId); // Cleanup on unmount
   }, [orderId, targetUserId]); // Re-fetch if orderId or targetUserId changes
 
-  const fetchChatMessages = async () => {
-    setLoading(true);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Pass false for isPollRequest, true for isManualRefresh for pull-to-refresh
+      await fetchChatMessages(false, true);
+    } catch (error) {
+      console.error("Error during manual refresh:", error); // Log specific error for refresh
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Modified fetchChatMessages to handle different loading states
+  const fetchChatMessages = async (isPollRequest, isManualRefresh) => {
+    if (!isPollRequest && !isManualRefresh) {
+      setLoading(true); // Full loader for initial mount
+    } else if (isPollRequest) {
+      setIsPollingMessages(true); // Subtle indicator for polling
+    }
+    // For isManualRefresh, isRefreshing is already true, managed by handleRefresh
+
     try {
       const axiosInstance = await generateAxiosInstance(true);
       let res;
@@ -47,12 +77,33 @@ const ChatScreen = () => {
       }
 
       if (res.data.status) {
-        setMessages(res.data.payload); // Messages are already ordered ASC from backend
+        const fetchedMessages = res.data.payload;
+        setMessages((prevMessages) => {
+          // Create a Set of existing message IDs for efficient lookup
+          const existingMessageIds = new Set(prevMessages.map(msg => msg.id));
+          // Filter out messages that are already present in the state
+          const newMessages = fetchedMessages.filter(msg => !existingMessageIds.has(msg.id));
+          // If there are no new messages, return the previous state to avoid re-render
+          if (newMessages.length === 0) {
+            return prevMessages;
+          }
+          // Combine old and new messages
+          const allMessages = [...prevMessages, ...newMessages];
+          // Sort messages by creation time
+          allMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          return allMessages;
+        });
       }
     } catch (error) {
-      console.error("Error fetching messages:", error);
+      console.error("Error fetching messages during poll:", error);
+      // Don't disrupt UI for polling errors, just log them.
     } finally {
-      setLoading(false);
+      if (!isPollRequest && !isManualRefresh) {
+        setLoading(false); // Stop full loader
+      } else if (isPollRequest) {
+        setIsPollingMessages(false); // Stop polling indicator
+      }
+      // For isManualRefresh, isRefreshing is set to false in handleRefresh's finally block
     }
   };
 
@@ -117,6 +168,9 @@ const ChatScreen = () => {
       <Text style={gstyles.gtitle}>
         {isOrderChat ? `Order ${orderId} Chat with ${targetUserName}` : `Chat with ${targetUserName || "User"}`}
       </Text>
+       {isPollingMessages && !loading && (
+         <Text style={styles.pollingIndicator}>Checking for new messages...</Text>
+       )}
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.primary} style={styles.loadingIndicator} />
       ) : (
@@ -128,6 +182,14 @@ const ChatScreen = () => {
           contentContainerStyle={styles.messagesList}
           onContentSizeChange={() => flatListRef.current.scrollToEnd({ animated: true })}
           onLayout={() => flatListRef.current.scrollToEnd({ animated: true })}
+           refreshControl={ // Add RefreshControl prop
+             <RefreshControl
+               refreshing={isRefreshing}
+               onRefresh={handleRefresh}
+               colors={[COLORS.primary]} // Optional: spinner color
+               tintColor={COLORS.primary} // Optional: spinner color for iOS
+             />
+           }
         />
       )}
       <View style={styles.inputContainer}>
@@ -222,6 +284,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  pollingIndicator: {
+    textAlign: 'center',
+    paddingVertical: 5,
+    fontSize: 12,
+    color: COLORS.gray,
   },
 });
 
