@@ -8,10 +8,12 @@ import BankRoutes from "./BankRoutes";
 import PlaceRoutes from "./PlaceRoutes";
 import CollectionRoutes from "./CollectionRoutes";
 import MessageRoutes from "./MessageRoutes";
+import AdminRoutes from "./AdminRoutes";
 const router = Router();
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default (): Router => {
+  AdminRoutes(router);
   UserRoutes(router);
   AuthRoutes(router);
   NotificationRoutes(router);

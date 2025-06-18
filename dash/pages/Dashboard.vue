@@ -12,14 +12,23 @@
             </div>
           </div>
   
-          <v-row class="mb-6">
+          <!-- Loading and Error Messages -->
+          <div v-if="isLoading" class="text-center my-4">
+            <v-progress-circular indeterminate color="primary"></v-progress-circular>
+            <p>Loading dashboard data...</p>
+          </div>
+          <div v-if="error" class="text-center my-4">
+            <v-alert type="error" dense outlined>{{ error }}</v-alert>
+          </div>
+
+          <v-row class="mb-6" v-if="!isLoading && !error">
             <v-col cols="12" sm="6" md="3">
               <v-card class="stat-card">
                 <v-card-text class="pb-2">
                   <div class="d-flex justify-space-between align-start">
                     <div>
                       <p class="text-body-2 text--secondary mb-1">Orders</p>
-                      <h2 class="text-h4 font-weight-bold">201</h2>
+                      <h2 class="text-h4 font-weight-bold">{{ totalOrders }}</h2>
                       <p class="text-caption text--secondary">+4.3% from last month</p>
                     </div>
                     <v-icon color="grey lighten-1">mdi-clipboard-list</v-icon>
@@ -33,8 +42,23 @@
                 <v-card-text class="pb-2">
                   <div class="d-flex justify-space-between align-start">
                     <div>
+                      <p class="text-body-2 text--secondary mb-1">Members</p>
+                      <h2 class="text-h4 font-weight-bold">{{ totalMembers }}</h2>
+                      <!-- Percentage change can be added later if available -->
+                    </div>
+                    <v-icon color="grey lighten-1">mdi-account-tie</v-icon>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+
+            <v-col cols="12" sm="6" md="3">
+              <v-card class="stat-card">
+                <v-card-text class="pb-2">
+                  <div class="d-flex justify-space-between align-start">
+                    <div>
                       <p class="text-body-2 text--secondary mb-1">Approved</p>
-                      <h2 class="text-h4 font-weight-bold">36</h2>
+                      <h2 class="text-h4 font-weight-bold">{{ completedOrders }}</h2>
                       <p class="text-caption text--secondary">+2.4% from last month</p>
                     </div>
                     <v-icon color="grey lighten-1">mdi-check-circle</v-icon>
@@ -49,7 +73,7 @@
                   <div class="d-flex justify-space-between align-start">
                     <div>
                       <p class="text-body-2 text--secondary mb-1">Users</p>
-                      <h2 class="text-h4 font-weight-bold">4,890</h2>
+                      <h2 class="text-h4 font-weight-bold">{{ totalUsers }}</h2>
                       <p class="text-caption text--secondary">+1.2% from last month</p>
                     </div>
                     <v-icon color="grey lighten-1">mdi-account-group</v-icon>
@@ -195,9 +219,44 @@
   </template>
   
   <script setup>
-  // In Nuxt 3 with Vue 3's Composition API, you don't need to import 'ref'
-  // if you're using it within <script setup>. It's auto-imported.
-  // However, if you were using <script> with setup(), you would need it.
+  import axios from 'axios';
+  import { ref, onMounted } from 'vue';
+
+  // Reactive variables for dashboard data
+  const totalOrders = ref(0);
+  const pendingOrders = ref(0);
+  const completedOrders = ref(0);
+  const totalUsers = ref(0);
+  const totalMembers = ref(0);
+  const isLoading = ref(false);
+  const error = ref(null);
+
+  // Function to fetch dashboard data
+  const fetchDashboardData = async () => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      // Ensure this URL is correct for your Nuxt/Axios setup
+      // It might need to be '/backend/admin/dashboard-stats' if Nuxt proxies requests to a backend service defined as 'backend'
+      const response = await axios.get('/api/admin/dashboard-stats');
+      const data = response.data;
+      totalOrders.value = data.totalOrders;
+      pendingOrders.value = data.pendingOrders;
+      completedOrders.value = data.completedOrders;
+      totalUsers.value = data.totalUsers;
+      totalMembers.value = data.totalMembers;
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      error.value = 'Failed to load dashboard data. Please try again later.';
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  // Fetch data when the component is mounted
+  onMounted(() => {
+    fetchDashboardData();
+  });
   
   // Customer orders data
   const customerOrders = [
