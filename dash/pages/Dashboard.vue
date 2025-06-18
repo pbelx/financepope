@@ -219,8 +219,8 @@
   </template>
   
   <script setup>
-  import axios from 'axios';
   import { ref, onMounted } from 'vue';
+  import { useNuxtApp } from '#app';
 
   // Reactive variables for dashboard data
   const totalOrders = ref(0);
@@ -235,10 +235,10 @@
   const fetchDashboardData = async () => {
     isLoading.value = true;
     error.value = null;
+    const nuxtApp = useNuxtApp();
     try {
       // Ensure this URL is correct for your Nuxt/Axios setup
-      // It might need to be '/backend/admin/dashboard-stats' if Nuxt proxies requests to a backend service defined as 'backend'
-      const response = await axios.get('/api/admin/dashboard-stats');
+      const response = await nuxtApp.$api.get('/admin/dashboard-stats');
       const data = response.data;
       totalOrders.value = data.totalOrders;
       pendingOrders.value = data.pendingOrders;
