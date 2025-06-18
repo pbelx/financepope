@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
-import Order from '../Models/Order';
-import User from '../Models/User';
+import { Order, getPendingOrdersCount, getCompletedOrdersCount } from "../Entities/Order";
+import { User } from "../Entities/User";
 
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const totalOrders = await Order.count();
-    const pendingOrders = await Order.getPendingOrdersCount();
-    const completedOrders = await Order.getCompletedOrdersCount();
+    const pendingOrders = await getPendingOrdersCount();
+    const completedOrders = await getCompletedOrdersCount();
     const totalUsers = await User.count({ where: { is_admin: false, is_member: false } });
     const totalMembers = await User.count({ where: { is_member: true } });
 
