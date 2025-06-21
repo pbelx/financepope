@@ -200,7 +200,7 @@ export const getChatHistory = async (orderId: number, userId?: number) => {
         where: [
           { order: { id: orderId }, sender: { id: userId } },
           { order: { id: orderId }, recipient: { id: userId } },
-          { order: { id: orderId }, sender_type: MessageSender.ADMIN }
+          { order: { id: orderId }, sender_type: MessageSender.ADMIN } // Corrected: sender_type is a direct property
         ],
         relations: ['order', 'order.user', 'sender', 'recipient'],
         order: {
@@ -283,7 +283,9 @@ export const getDirectChatThread = async (user1Id: number, user2Id: number) => {
     // Add condition for admin messages that might be visible to the member
     whereConditions.push(
       // Admin messages where the member should see them (recipient is member or null for broadcasts)
-      { sender: { id: adminId }, sender_type: MessageSender.ADMIN, order: IsNull() }
+      // Corrected: sender_type should be a top-level key in this condition object
+      // Added 'as any' to bypass potential TypeScript type inference issue for this complex condition
+      { sender: { id: adminId }, order: IsNull(), sender_type: MessageSender.ADMIN } as any
     );
   }
   

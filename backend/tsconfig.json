@@ -5,13 +5,10 @@
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "outDir": "../dist",
-    "rootDir": ".",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
   "ts-node": {
     "esm": true
-  },
-  "include": ["**/*"]
+  }
 }
