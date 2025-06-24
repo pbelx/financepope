@@ -32,8 +32,8 @@
           <v-col cols="12" sm="6" md="4" lg="2">
             <v-card class="stat-card" color="primary" dark>
               <v-card-text class="text-center">
-                <v-icon size="48" class="mb-2">mdi-clipboard-list</v-icon>
-                <div class="text-h3 font-weight-bold">{{ totalOrders }}</div>
+                <v-icon size="30" class="mb-2">mdi-clipboard-list</v-icon>
+                <div class="text-h5 font-weight-bold">{{ totalOrders }}</div>
                 <div class="text-body-2">Total Orders</div>
               </v-card-text>
             </v-card>
@@ -43,8 +43,8 @@
           <v-col cols="12" sm="6" md="4" lg="2">
             <v-card class="stat-card" color="success" dark>
               <v-card-text class="text-center">
-                <v-icon size="48" class="mb-2">mdi-account-group</v-icon>
-                <div class="text-h3 font-weight-bold">{{ totalUsers }}</div>
+                <v-icon size="30" class="mb-2">mdi-account-group</v-icon>
+                <div class="text-h5 font-weight-bold">{{ totalUsers }}</div>
                 <div class="text-body-2">Total Users</div>
               </v-card-text>
             </v-card>
@@ -54,8 +54,8 @@
           <v-col cols="12" sm="6" md="4" lg="2">
             <v-card class="stat-card" color="error" dark>
               <v-card-text class="text-center">
-                <v-icon size="48" class="mb-2">mdi-shield-account</v-icon>
-                <div class="text-h3 font-weight-bold">{{ totalAdmins }}</div>
+                <v-icon size="30" class="mb-2">mdi-shield-account</v-icon>
+                <div class="text-h5 font-weight-bold">{{ totalAdmins }}</div>
                 <div class="text-body-2">Admins</div>
               </v-card-text>
             </v-card>
@@ -65,8 +65,8 @@
           <v-col cols="12" sm="6" md="4" lg="2">
             <v-card class="stat-card" color="info" dark>
               <v-card-text class="text-center">
-                <v-icon size="48" class="mb-2">mdi-bank</v-icon>
-                <div class="text-h3 font-weight-bold">{{ totalBanks }}</div>
+                <v-icon size="30" class="mb-2">mdi-bank</v-icon>
+                <div class="text-h5 font-weight-bold">{{ totalBanks }}</div>
                 <div class="text-body-2">Banks</div>
               </v-card-text>
             </v-card>
@@ -76,8 +76,8 @@
           <v-col cols="12" sm="6" md="4" lg="2">
             <v-card class="stat-card" color="warning" dark>
               <v-card-text class="text-center">
-                <v-icon size="48" class="mb-2">mdi-currency-usd</v-icon>
-                <div class="text-h3 font-weight-bold">{{ totalCurrencies }}</div>
+                <v-icon size="30" class="mb-2">mdi-currency-usd</v-icon>
+                <div class="text-h5 font-weight-bold">{{ totalCurrencies }}</div>
                 <div class="text-body-2">Currencies</div>
               </v-card-text>
             </v-card>
@@ -87,8 +87,8 @@
           <v-col cols="12" sm="6" md="4" lg="2">
             <v-card class="stat-card" color="orange" dark>
               <v-card-text class="text-center">
-                <v-icon size="48" class="mb-2">mdi-clock-alert</v-icon>
-                <div class="text-h3 font-weight-bold">{{ pendingOrders }}</div>
+                <v-icon size="30" class="mb-2">mdi-clock-alert</v-icon>
+                <div class="text-h5 font-weight-bold">{{ pendingOrders }}</div>
                 <div class="text-body-2">Pending Orders</div>
               </v-card-text>
             </v-card>

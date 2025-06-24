@@ -230,6 +230,7 @@
                       small
                       color="error"
                       outlined
+                      disabled
                     >
                       <v-icon small>mdi-delete</v-icon>
                     </v-btn>
