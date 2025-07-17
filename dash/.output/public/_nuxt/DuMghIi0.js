@@ -1,0 +1,1 @@
+import{_ as n,E as t,C as r,y as o,z as a}from"./Y5SXhFhQ.js";import{V as s}from"./Faow3G0v.js";import"./DfG7YTip.js";const c={};function _(i,e){return o(),t(s,null,{default:r(()=>e[0]||(e[0]=[a("h1",null,"Finance Index",-1)])),_:1,__:[0]})}const m=n(c,[["render",_]]);export{m as default};

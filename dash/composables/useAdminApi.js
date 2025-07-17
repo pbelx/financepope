@@ -48,7 +48,7 @@ export const useAdminApi = () => {
 
   const makeUserMember = async (userId) => {
     try {
-      const response = await $api.post('/users/make-member', { userId });
+      const response = await $api.post('/users/make-member', { id: userId });
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error making user member:', error);
@@ -58,7 +58,7 @@ export const useAdminApi = () => {
 
   const makeUserAdmin = async (userId) => {
     try {
-      const response = await $api.post('/users/make-admin', { userId });
+      const response = await $api.post('/users/make-admin', { id: userId });
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error making user admin:', error);
@@ -68,7 +68,7 @@ export const useAdminApi = () => {
 
   const makeUserRegular = async (userId) => {
     try {
-      const response = await $api.post('/users/make-user', { userId });
+      const response = await $api.post('/users/make-user', { id: userId });
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error making user regular:', error);

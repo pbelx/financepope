@@ -202,7 +202,6 @@ export const getUsers = async () => {
   const users = await User.find({
     where: {
       is_admin: false,
-      is_member: false
     },
     order: {
       id: "DESC"

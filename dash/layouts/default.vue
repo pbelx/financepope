@@ -24,18 +24,28 @@
       clipped
     >
       <v-list>
-        <v-list-item
-          v-for="item in navItems"
-          :key="item.to"
-          :to="item.to"
-          router
-          exact
-        >
-          <template v-slot:prepend>
-            <v-icon>{{ item.icon }}</v-icon>
-          </template>
-          <v-list-item-title>{{ item.title }}</v-list-item-title>
-        </v-list-item>
+        <template v-for="item in navItems" :key="item.title">
+          <v-list-group v-if="item.subItems" :value="item.title">
+            <template v-slot:activator="{ props }">
+              <v-list-item v-bind="props" :prepend-icon="item.icon" :title="item.title"></v-list-item>
+            </template>
+            <v-list-item
+              v-for="subItem in item.subItems"
+              :key="subItem.to"
+              :to="subItem.to"
+              router
+              exact
+            >
+              <v-list-item-title>{{ subItem.title }}</v-list-item-title>
+            </v-list-item>
+          </v-list-group>
+          <v-list-item v-else :to="item.to" router exact>
+            <template v-slot:prepend>
+              <v-icon>{{ item.icon }}</v-icon>
+            </template>
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
+        </template>
       </v-list>
     </v-navigation-drawer>
     
@@ -59,7 +69,13 @@ const navItems = [
   { to: '/collections', icon: 'mdi-folder-multiple', title: 'Collections' },
   { to: '/admin/messages', icon: 'mdi-message', title: 'Messages' },
   { to: '/currency-management', icon: 'mdi-cash', title: 'Currency' },
-  // { to: '/index', icon: 'mdi-folder-multiple', title: 'Home' },
+  { to: '/places', icon: 'mdi-map-marker', title: 'Places' },
+  { to: '/banks', icon: 'mdi-bank', title: 'Banks' },
+
+  { to: '/members', icon: 'mdi-account-group-outline', title: 'Members' },
+  { to: '/users', icon: 'mdi-account-group-outline', title: 'Users' },
+
+
 ];
 
 const toggleDrawer = () => {
