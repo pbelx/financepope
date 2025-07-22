@@ -65,7 +65,8 @@ const drawer = ref(true); // Start with drawer open
 
 const navItems = [
   { to: '/dashboard', icon: 'mdi-view-dashboard', title: 'Dashboard' },
-  { to: '/pendingorders', icon: 'mdi-clipboard-list', title: 'Orders' },
+  { to: '/pendingorders', icon: 'mdi-clipboard-list', title: 'Pending Orders' },
+  { to: '/orderstatus', icon: 'mdi-format-list-checks', title: 'All Orders' },
   { to: '/collections', icon: 'mdi-folder-multiple', title: 'Collections' },
   { to: '/admin/messages', icon: 'mdi-message', title: 'Messages' },
   { to: '/currency-management', icon: 'mdi-cash', title: 'Currency' },

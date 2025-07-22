@@ -30,4 +30,5 @@ export { requestIdleCallback, cancelIdleCallback } from '#app/compat/idle-callba
 export { setInterval } from '#app/compat/interval';
 export { useAdminApi } from '../composables/useAdminApi';
 export { useAuth } from '../composables/useAuth';
+export { useOrderStatus } from '../composables/useOrderStatus';
 export { definePageMeta } from '../node_modules/nuxt/dist/pages/runtime/composables';
