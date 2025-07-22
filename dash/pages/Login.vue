@@ -105,7 +105,6 @@
 
 <script setup>
 definePageMeta({
-  middleware: 'guest',
   layout: 'auth'
 });
 
