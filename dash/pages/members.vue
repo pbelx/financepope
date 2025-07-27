@@ -84,10 +84,10 @@
                   icon
                   size="small"
                   variant="text"
-                  color="grey"
-                  disabled
+                  color="primary"
+                  @click="viewMemberDetails(item)"
                 >
-                  <v-icon>mdi-pencil</v-icon>
+                  <v-icon>mdi-eye</v-icon>
                 </v-btn>
               </template>
             </v-data-table>
@@ -126,6 +126,7 @@ definePageMeta({
 // Composables
 const config = useRuntimeConfig()
 const { token } = useAuth()
+const router = useRouter()
 
 // Reactive data
 const users = ref([])
@@ -169,6 +170,10 @@ const formatDate = (dateString) => {
 const showError = (message) => {
   errorMessage.value = message
   errorSnackbar.value = true
+}
+
+const viewMemberDetails = (member) => {
+  router.push(`/memberdetails?id=${member.id}`)
 }
 
 // API functions
