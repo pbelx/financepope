@@ -358,6 +358,21 @@ export const getPendingOrdersByDateRange = async (
     },
   });
 };
+
+// Get pending orders by member ID (assigned member)
+export const getMemberPendingOrders = async (
+  memberId: number
+): Promise<Order[]> => {
+  return await Order.find({
+    where: {
+      member: { id: memberId },
+      status: "pending",
+    },
+    order: {
+      createdAt: "DESC",
+    },
+  });
+};
 // end Pete edits 
 
 // Note: You'll need to import Between from typeorm at the top of your Order.ts file:

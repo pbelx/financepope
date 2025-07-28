@@ -112,5 +112,11 @@ export default (router: Router) => {
     JWTAuthMiddleWare,
     handleGetPendingOrdersByDateRange
   );
+
+  router.get(
+    `${OrderPrefix}/pending/member/:memberId`,
+    JWTAuthMiddleWare,
+    handleGetMemberPendingOrders
+  );
 };
 

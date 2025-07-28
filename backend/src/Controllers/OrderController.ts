@@ -495,3 +495,26 @@ export const handleGetPendingOrdersByDateRange = async (req: Request, res: Respo
       .end();
   }
 };
+
+// Get pending orders for a specific member (assigned member)
+export const handleGetMemberPendingOrders = async (req: Request, res: Response) => {
+  try {
+    const { memberId } = req.params;
+    
+    if (!memberId) {
+      return res
+        .status(400)
+        .json(customPayloadResponse(false, "Member ID is required"))
+        .end();
+    }
+    
+    const orders = await getMemberPendingOrders(parseInt(memberId));
+    return res.status(200).json(customPayloadResponse(true, orders)).end();
+  } catch (error) {
+    console.error("Error fetching member pending orders:", error);
+    return res
+      .status(500)
+      .json(customPayloadResponse(false, "Internal server error"))
+      .end();
+  }
+};
