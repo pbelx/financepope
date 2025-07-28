@@ -39,7 +39,7 @@
               </v-col>
             </v-row>
             <v-row>
-              <v-col cols="12" md="6">
+              <v-col cols="12" md="4">
                 <v-select
                   v-model="selectedMemberId"
                   :items="memberOptions"
@@ -51,7 +51,29 @@
                   prepend-inner-icon="mdi-account"
                 />
               </v-col>
-              <v-col cols="12" md="6" class="d-flex align-center">
+              <v-col cols="12" md="4">
+                <v-select
+                  v-model="paymentMethod"
+                  :items="['cash', 'bank', 'mobile_money']"
+                  label="Payment Method"
+                  variant="outlined"
+                  :rules="[rules.required]"
+                  prepend-inner-icon="mdi-credit-card"
+                />
+              </v-col>
+              <v-col v-if="paymentMethod === 'bank'" cols="12" md="4">
+                <v-select
+                  v-model="selectedBank"
+                  :items="bankOptions"
+                  label="Select Bank"
+                  item-title="display"
+                  item-value="id"
+                  variant="outlined"
+                  :rules="[rules.required]"
+                  prepend-inner-icon="mdi-bank"
+                />
+              </v-col>
+              <v-col cols="12" md="4" class="d-flex align-center">
                 <v-btn
                   type="submit"
                   color="primary"
@@ -153,6 +175,11 @@
                 {{ formatDate(item.created_at) }}
               </span>
             </template>
+
+            <template #item.paymentMethod="{ item }">
+              <div>{{ item.paymentMethod }}</div>
+              <div v-if="item.paymentMethod === 'bank'" class="text-caption">{{ item.bankName }}</div>
+            </template>
   
             <template #item.actions="{ item }">
               <v-btn
@@ -211,6 +238,7 @@
   const collections = ref([])
   const currencies = ref([])
   const members = ref([])
+  const banks = ref([])
   const loading = ref(false)
   const creatingCollection = ref(false)
   
@@ -218,6 +246,8 @@
   const amount = ref('')
   const selectedCurrencyId = ref(null)
   const selectedMemberId = ref(null)
+  const paymentMethod = ref(null)
+  const selectedBank = ref(null)
   
   // UI state
   const snackbar = ref({
@@ -231,6 +261,7 @@
     { title: 'ID', key: 'id', sortable: true, width: '100px' },
     { title: 'Amount', key: 'amount', sortable: true },
     { title: 'Currency', key: 'currency_display', sortable: false }, // New currency column
+    { title: 'Payment Method', key: 'paymentMethod', sortable: true, width: '150px' },
     { title: 'Status', key: 'status', sortable: true, width: '120px' },
     { title: 'Member', key: 'member', sortable: false },
     { title: 'Created Date', key: 'created_at', sortable: true, width: '120px' },
@@ -260,11 +291,19 @@
       display: member.full_name || member.email || `Member ID: ${member.id}`
     }))
   })
+
+  const bankOptions = computed(() => {
+    return banks.value.map(bank => ({
+      id: bank.id,
+      display: bank.name
+    }))
+  })
   
   const isFormValid = computed(() => {
     return amount.value &&
                selectedCurrencyId.value &&
                selectedMemberId.value &&
+               paymentMethod.value &&
                parseFloat(amount.value) > 0
   })
   
@@ -395,6 +434,24 @@
       showSnackbar(`Error fetching members: ${error.message}`, 'error')
     }
   }
+
+  const fetchBanks = async () => {
+    try {
+      const response = await $fetch(`${config.public.apiBaseUrl}/banks`, {
+        headers: getAuthHeaders()
+      })
+
+      if (response.status && response.payload) {
+        banks.value = response.payload
+      } else {
+        console.error('Failed to fetch banks:', response.payload || 'Unknown error')
+        showSnackbar('Failed to fetch banks', 'error')
+      }
+    } catch (error) {
+      console.error('Error fetching banks:', error)
+      showSnackbar(`Error fetching banks: ${error.message}`, 'error')
+    }
+  }
   
   const fetchCollections = async () => {
     loading.value = true
@@ -413,7 +470,8 @@
             member: member, // Add the full member object
             currency: currency, // The full currency object is already there from the API
             // Add a display property for the currency column
-            currency_display: currency ? (currency.symbol || currency.code || currency.name) : 'N/A'
+            currency_display: currency ? (currency.symbol || currency.code || currency.name) : 'N/A',
+            bankName: collection.paymentMethod === 'bank' ? collection.bankName : undefined
           };
         });
       } else {
@@ -442,7 +500,9 @@
         body: {
           amount: parseFloat(amount.value),
           userId: selectedMemberId.value,
-          currencyId: selectedCurrencyId.value
+          currencyId: selectedCurrencyId.value,
+          paymentMethod: paymentMethod.value,
+          bankName: paymentMethod.value === 'bank' ? banks.value.find(bank => bank.id === selectedBank.value)?.name : undefined
         }
       })
   
@@ -473,7 +533,8 @@
     // relies on member/currency details for display.
     await Promise.all([
       fetchCurrencies(),
-      fetchMembers()
+      fetchMembers(),
+      fetchBanks()
     ]);
     await fetchCollections();
   })
